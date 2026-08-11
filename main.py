@@ -8,12 +8,13 @@ from discord.ext import commands
 from discord import app_commands
 from keep_alive import keep_alive
 
-# Configuração das Intents necessárias
+# =========================================================
+# CONFIGURAÇÃO E INICIALIZAÇÃO
+# =========================================================
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-# Inicialização do Bot
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # ID do seu servidor no Discord (Guild)
@@ -44,12 +45,11 @@ async def on_ready():
     guild = discord.Object(id=GUILD_ID)
     bot.tree.copy_global_to(guild=guild)
     await bot.tree.sync(guild=guild)
-    print(f"🤖 Bot online e sincronizado como {bot.user}")
+    print(f"🤖 Bot online e sincronizado com sucesso como: {bot.user}")
 
 # =========================================================
 # 🪙 SISTEMA DE GOLDS (ECONOMIA)
 # =========================================================
-
 @bot.tree.command(name="carteira", description="Exibe o seu saldo atual de Golds.")
 async def carteira(interaction: discord.Interaction, usuario: discord.Member = None):
     target = usuario or interaction.user
@@ -121,7 +121,6 @@ async def rank(interaction: discord.Interaction):
 # =========================================================
 # 🎮 JOGO DA VELHA
 # =========================================================
-
 class TicTacToeButton(discord.ui.Button):
     def __init__(self, x: int, y: int):
         super().__init__(style=discord.ButtonStyle.secondary, label="", row=y)
@@ -185,7 +184,6 @@ async def velha(interaction: discord.Interaction, oponente: discord.Member):
 # =========================================================
 # 🔐 SISTEMA DE REGISTRO POR PALAVRA-PASSE
 # =========================================================
-
 @bot.tree.command(name="set_chat_filtracao", description="[ADMIN] Define o canal de filtração.")
 @app_commands.checks.has_permissions(administrator=True)
 async def set_chat_filtracao(interaction: discord.Interaction, canal: discord.TextChannel):
@@ -244,18 +242,6 @@ async def on_message(message: discord.Message):
             await message.delete()
         except discord.Forbidden:
             pass
-    
-    
-# Inicia o servidor Web
-keep_alive()
-
-GUILD_ID = 1434359569718706320  # ID do seu servidor
-
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
-
-bot = commands.Bot(command_prefix="!", intents=intents)
 
 # ==========================================
 # 🎫 SISTEMA DE TICKETS & ATENDIMENTO
@@ -284,7 +270,6 @@ class MenuOpcoesTicket(discord.ui.Select):
         guild = interaction.guild
         membro = interaction.user
 
-        # Nome do canal em minúsculo e sem espaços/caracteres especiais
         nome_canal = f"ticket-{membro.name.lower().replace(' ', '-')}"
 
         canal_existente = discord.utils.get(guild.channels, name=nome_canal)
@@ -319,9 +304,6 @@ class PainelTicketView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(MenuOpcoesTicket())
 
-# ==========================================
-# 🎫 COMANDO PARA ENVIAR O PAINEL DE TICKETS
-# ==========================================
 @bot.tree.command(name="painelticket", description="Envia o painel fixo de abertura de tickets no canal")
 @app_commands.checks.has_permissions(administrator=True)
 async def painelticket(interaction: discord.Interaction):
@@ -331,12 +313,10 @@ async def painelticket(interaction: discord.Interaction):
         color=discord.Color.blue()
     )
     embed.set_footer(text="Zy-Bot • Sistema de Atendimento Automático")
-    
-    # Envia o painel direto na resposta da interação
     await interaction.response.send_message(embed=embed, view=PainelTicketView())
 
 # ==========================================
-# 🛠️ UTILITÁRIOS (/ping, /userinfo, /serverinfo, /ajuda, /avatar, /embed, /enquete, /lembrete, /moeda)
+# 🛠️ UTILITÁRIOS
 # ==========================================
 @bot.tree.command(name="ping", description="Verifica a latência do bot")
 async def ping(interaction: discord.Interaction):
@@ -383,8 +363,13 @@ async def ajuda(interaction: discord.Interaction):
         inline=False
     )
     embed.add_field(
-        name="🎫 Atendimento", 
-        value="`/painelticket` - Envia o painel de suporte interativo", 
+        name="🪙 Economia & Games", 
+        value="`/carteira` `/daily` `/pay` `/rank` `/velha`", 
+        inline=False
+    )
+    embed.add_field(
+        name="🎫 Atendimento & Registro", 
+        value="`/painelticket` `/set_chat_filtracao` `/set_passe_cargo`", 
         inline=False
     )
     embed.add_field(
@@ -543,7 +528,6 @@ async def sorteio(interaction: discord.Interaction, premio: str):
     embed = discord.Embed(title="🎉 SORTEIO!", description=f"**Prêmio:** {premio}\n🏆 **Vencedor:** {vencedor.mention}", color=discord.Color.gold())
     await interaction.followup.send(embed=embed)
 
-# Trata erro de permissões dos comandos Slash
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.MissingPermissions):
@@ -556,6 +540,8 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 # ==========================================
 # 🚀 INICIALIZAÇÃO
 # ==========================================
+keep_alive()
+
 async def main():
     async with bot:
         token = os.environ.get('DISCORD_TOKEN')
