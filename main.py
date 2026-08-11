@@ -19,7 +19,7 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # ==========================================
-# 🎫 SISTEMA DE TICKETS & ATENDIMENTO (INTERATIVO)
+# 🎫 SISTEMA DE TICKETS & ATENDIMENTO
 # ==========================================
 class BotaoFecharTicket(discord.ui.View):
     def __init__(self):
@@ -27,16 +27,16 @@ class BotaoFecharTicket(discord.ui.View):
 
     @discord.ui.button(label="🔒 Fechar Ticket", style=discord.ButtonStyle.red, custom_id="fechar_ticket_btn")
     async def fechar_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("🔒 Este ticket será apagado em **5 segundos**...")
+        await interaction.response.send_message("🔒 Este ticket será apagado em **5 segundos**...", ephemeral=True)
         await asyncio.sleep(5)
         await interaction.channel.delete()
 
 class MenuOpcoesTicket(discord.ui.Select):
     def __init__(self):
         options = [
-            discord.SelectOption(label="Suporte Geral", description="Dúvidas ou ajuda com o servidor", emoji="❓"),
-            discord.SelectOption(label="Atendimento / Compras", description="Falar sobre planos, orçamentos ou serviços", emoji="🛒"),
-            discord.SelectOption(label="Denúncia / Moderação", description="Reportar um membro ou problema", emoji="🛡️"),
+            discord.SelectOption(label="Suporte Geral", description="Dúvidas ou ajuda com o servidor", emoji="❓", value="Suporte Geral"),
+            discord.SelectOption(label="Atendimento / Compras", description="Falar sobre planos ou serviços", emoji="🛒", value="Atendimento / Compras"),
+            discord.SelectOption(label="Denúncia / Moderação", description="Reportar um membro ou problema", emoji="🛡️", value="Denúncia / Moderação"),
         ]
         super().__init__(placeholder="Selecione o motivo do seu atendimento...", min_values=1, max_values=1, options=options, custom_id="select_ticket_categoria")
 
@@ -45,22 +45,22 @@ class MenuOpcoesTicket(discord.ui.Select):
         guild = interaction.guild
         membro = interaction.user
 
-        # Verifica se já existe um ticket aberto para o usuário
-        canal_existente = discord.utils.get(guild.channels, name=f"ticket-{membro.name.lower()}")
+        # Nome do canal em minúsculo e sem espaços/caracteres especiais
+        nome_canal = f"ticket-{membro.name.lower().replace(' ', '-')}"
+
+        canal_existente = discord.utils.get(guild.channels, name=nome_canal)
         if canal_existente:
             await interaction.response.send_message(f"⚠️ Você já tem um ticket aberto em {canal_existente.mention}!", ephemeral=True)
             return
 
-        # Permissões do canal privado
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
             membro: discord.PermissionOverwrite(read_messages=True, send_messages=True, attach_files=True),
             guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_channels=True)
         }
 
-        # Cria o canal de Ticket
         canal_ticket = await guild.create_text_channel(
-            name=f"ticket-{membro.name}",
+            name=nome_canal,
             overwrites=overwrites,
             reason=f"Ticket aberto por {membro.name}"
         )
@@ -81,53 +81,11 @@ class PainelTicketView(discord.ui.View):
         self.add_item(MenuOpcoesTicket())
 
 # ==========================================
-# 🟢 EVENTOS DE INICIALIZAÇÃO
-# ==========================================
-@bot.event
-async def on_ready():
-    print("--------------------------------------")
-    print(f"🤖 BOT ONLINE: {bot.user}")
-    print("--------------------------------------")
-    
-    # Registra a View persistente para que o painel de ticket continue funcionando mesmo se o bot reiniciar
-    bot.add_view(PainelTicketView())
-    bot.add_view(BotaoFecharTicket())
-    
-    await bot.change_presence(
-        activity=discord.Activity(
-            type=discord.ActivityType.watching, 
-            name="/ajuda | Zy-Bot v2.0"
-        )
-    )
-    
-    try:
-        guild = discord.Object(id=GUILD_ID)
-        bot.tree.copy_global_to(guild=guild)
-        synced = await bot.tree.sync(guild=guild)
-        print(f"✅ {len(synced)} comandos Slash sincronizados no servidor!")
-    except Exception as e:
-        print(f"❌ Erro ao sincronizar comandos: {e}")
-
-@bot.event
-async def on_member_join(member: discord.Member):
-    channel = member.guild.system_channel
-    if channel:
-        embed = discord.Embed(
-            title="👋 Bem-vindo(a) ao servidor!",
-            description=f"Olá {member.mention}, seja muito bem-vindo ao **{member.guild.name}**!",
-            color=discord.Color.brand_green()
-        )
-        embed.set_thumbnail(url=member.display_avatar.url)
-        await channel.send(embed=embed)
-
-# ==========================================
 # 🎫 COMANDO PARA ENVIAR O PAINEL DE TICKETS
 # ==========================================
 @bot.tree.command(name="painelticket", description="Envia o painel fixo de abertura de tickets no canal")
 @app_commands.checks.has_permissions(administrator=True)
 async def painelticket(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
-    
     embed = discord.Embed(
         title="💬 Central de Suporte & Atendimento",
         description="Precisa de ajuda, suporte ou quer tratar de algum assunto privado?\n\nEscolha uma categoria no menu suspenso abaixo para abrir um **canal de atendimento privado** com a nossa equipe.",
@@ -135,8 +93,8 @@ async def painelticket(interaction: discord.Interaction):
     )
     embed.set_footer(text="Zy-Bot • Sistema de Atendimento Automático")
     
-    await interaction.channel.send(embed=embed, view=PainelTicketView())
-    await interaction.followup.send("✅ Painel de Tickets enviado com sucesso!", ephemeral=True)
+    # Envia o painel direto na resposta da interação
+    await interaction.response.send_message(embed=embed, view=PainelTicketView())
 
 # ==========================================
 # 🛠️ UTILITÁRIOS (/ping, /userinfo, /serverinfo, /ajuda, /avatar, /embed, /enquete, /lembrete, /moeda)
