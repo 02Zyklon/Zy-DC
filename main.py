@@ -2,11 +2,250 @@ import os
 import asyncio
 import datetime
 import random
+import json
 import discord
 from discord.ext import commands
 from discord import app_commands
 from keep_alive import keep_alive
 
+# Configuração das Intents necessárias
+intents = discord.Intents.default()
+intents.message_content = True
+intents.members = True
+
+# Inicialização do Bot
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+# ID do seu servidor no Discord (Guild)
+GUILD_ID = 1434359569718706320
+
+# Arquivos de armazenamento em JSON
+DB_ECONOMIA = "database_golds.json"
+DB_REGISTRO = "config_registro.json"
+
+def load_json(file_path, default):
+    if not os.path.exists(file_path):
+        return default
+    with open(file_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_json(file_path, data):
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
+
+def get_user_gold(db, user_id):
+    uid = str(user_id)
+    if uid not in db:
+        db[uid] = {"gold": 100}
+    return db[uid]
+
+@bot.event
+async def on_ready():
+    guild = discord.Object(id=GUILD_ID)
+    bot.tree.copy_global_to(guild=guild)
+    await bot.tree.sync(guild=guild)
+    print(f"🤖 Bot online e sincronizado como {bot.user}")
+
+# =========================================================
+# 🪙 SISTEMA DE GOLDS (ECONOMIA)
+# =========================================================
+
+@bot.tree.command(name="carteira", description="Exibe o seu saldo atual de Golds.")
+async def carteira(interaction: discord.Interaction, usuario: discord.Member = None):
+    target = usuario or interaction.user
+    db = load_json(DB_ECONOMIA, {})
+    data = get_user_gold(db, target.id)
+
+    embed = discord.Embed(
+        title="🏛️ Banco Central Zy",
+        description=f"Detalhamento financeiro de {target.mention}",
+        color=discord.Color.gold()
+    )
+    embed.set_thumbnail(url=target.display_avatar.url)
+    embed.add_field(name="💰 Saldo em Golds", value=f"`{data['gold']:,}` 📀", inline=False)
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="daily", description="Resgate sua recompensa diária de Golds.")
+async def daily(interaction: discord.Interaction):
+    db = load_json(DB_ECONOMIA, {})
+    user_data = get_user_gold(db, interaction.user.id)
+
+    reward = random.randint(250, 600)
+    user_data["gold"] += reward
+    save_json(DB_ECONOMIA, db)
+
+    embed = discord.Embed(
+        title="🎁 Recompensa Diária Coletada!",
+        description=f"Você recebeu **+{reward}** Golds 📀!",
+        color=discord.Color.green()
+    )
+    embed.add_field(name="Novo Saldo", value=f"`{user_data['gold']:,}` 📀")
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="pay", description="Transfira Golds para outro usuário.")
+async def pay(interaction: discord.Interaction, destino: discord.Member, quantia: int):
+    if quantia <= 0 or destino.id == interaction.user.id:
+        return await interaction.response.send_message("❌ Operação inválida.", ephemeral=True)
+
+    db = load_json(DB_ECONOMIA, {})
+    autor_data = get_user_gold(db, interaction.user.id)
+    destino_data = get_user_gold(db, destino.id)
+
+    if autor_data["gold"] < quantia:
+        return await interaction.response.send_message("❌ Saldo insuficiente!", ephemeral=True)
+
+    autor_data["gold"] -= quantia
+    destino_data["gold"] += quantia
+    save_json(DB_ECONOMIA, db)
+
+    await interaction.response.send_message(f"💸 **{interaction.user.mention}** enviou **{quantia:,}** Golds 📀 para **{destino.mention}**!")
+
+@bot.tree.command(name="rank", description="Exibe o Ranking dos usuários mais ricos.")
+async def rank(interaction: discord.Interaction):
+    db = load_json(DB_ECONOMIA, {})
+    sorted_users = sorted(db.items(), key=lambda x: x[1].get("gold", 0), reverse=True)[:10]
+
+    embed = discord.Embed(title="🏆 Ranking de Golds - Top 10", color=discord.Color.gold())
+    medals = ["🥇", "🥈", "🥉"]
+    desc = ""
+
+    for idx, (uid, data) in enumerate(sorted_users, 1):
+        user = bot.get_user(int(uid))
+        name = user.display_name if user else f"Usuário ({uid})"
+        prefix = medals[idx-1] if idx <= 3 else f"`#{idx}`"
+        desc += f"{prefix} **{name}** — `{data.get('gold', 0):,}` 📀\n"
+
+    embed.description = desc or "Sem dados econômicos."
+    await interaction.response.send_message(embed=embed)
+
+# =========================================================
+# 🎮 JOGO DA VELHA
+# =========================================================
+
+class TicTacToeButton(discord.ui.Button):
+    def __init__(self, x: int, y: int):
+        super().__init__(style=discord.ButtonStyle.secondary, label="", row=y)
+        self.x, self.y = x, y
+
+    async def callback(self, interaction: discord.Interaction):
+        view: TicTacToeView = self.view
+        if view.board[self.y][self.x] != 0:
+            return await interaction.response.send_message("❌ Posição ocupada!", ephemeral=True)
+        if interaction.user != view.current_player:
+            return await interaction.response.send_message("❌ Não é sua vez!", ephemeral=True)
+
+        if view.current_player == view.player_x:
+            self.style, self.label = discord.ButtonStyle.danger, "X"
+            view.board[self.y][self.x] = 1
+            view.current_player = view.player_o
+            content = f"Vez de: {view.player_o.mention} (O)"
+        else:
+            self.style, self.label = discord.ButtonStyle.primary, "O"
+            view.board[self.y][self.x] = 2
+            view.current_player = view.player_x
+            content = f"Vez de: {view.player_x.mention} (X)"
+
+        self.disabled = True
+        winner = view.check_winner()
+
+        if winner is not None:
+            content = f"🎉 **{view.player_x.mention} (X) Venceu!**" if winner == 1 else (
+                f"🎉 **{view.player_o.mention} (O) Venceu!**" if winner == 2 else "👔 **Empate!**"
+            )
+            for child in view.children: child.disabled = True
+            view.stop()
+
+        await interaction.response.edit_message(content=content, view=view)
+
+class TicTacToeView(discord.ui.View):
+    def __init__(self, player_x: discord.Member, player_o: discord.Member):
+        super().__init__(timeout=180)
+        self.player_x, self.player_o, self.current_player = player_x, player_o, player_x
+        self.board = [[0]*3 for _ in range(3)]
+        for y in range(3):
+            for x in range(3):
+                self.add_item(TicTacToeButton(x, y))
+
+    def check_winner(self):
+        for i in range(3):
+            if self.board[i][0] == self.board[i][1] == self.board[i][2] != 0: return self.board[i][0]
+            if self.board[0][i] == self.board[1][i] == self.board[2][i] != 0: return self.board[0][i]
+        if self.board[0][0] == self.board[1][1] == self.board[2][2] != 0: return self.board[0][0]
+        if self.board[0][2] == self.board[1][1] == self.board[2][0] != 0: return self.board[0][2]
+        if all(cell != 0 for row in self.board for cell in row): return 0
+        return None
+
+@bot.tree.command(name="velha", description="Desafie um amigo para o Jogo da Velha!")
+async def velha(interaction: discord.Interaction, oponente: discord.Member):
+    if oponente.bot or oponente.id == interaction.user.id:
+        return await interaction.response.send_message("❌ Oponente inválido!", ephemeral=True)
+    view = TicTacToeView(player_x=interaction.user, player_o=oponente)
+    await interaction.response.send_message(f"🎮 **Jogo da Velha!**\n{interaction.user.mention} (X) vs {oponente.mention} (O)", view=view)
+
+# =========================================================
+# 🔐 SISTEMA DE REGISTRO POR PALAVRA-PASSE
+# =========================================================
+
+@bot.tree.command(name="set_chat_filtracao", description="[ADMIN] Define o canal de filtração.")
+@app_commands.checks.has_permissions(administrator=True)
+async def set_chat_filtracao(interaction: discord.Interaction, canal: discord.TextChannel):
+    cfg = load_json(DB_REGISTRO, {"canal_filtracao": None, "palavras": {}})
+    cfg["canal_filtracao"] = canal.id
+    save_json(DB_REGISTRO, cfg)
+    await interaction.response.send_message(f"✅ Canal de filtração definido para: {canal.mention}")
+
+@bot.tree.command(name="set_passe_cargo", description="[ADMIN] Registra palavra-passe para um cargo.")
+@app_commands.checks.has_permissions(administrator=True)
+async def set_passe_cargo(interaction: discord.Interaction, palavra_passe: str, cargo: discord.Role):
+    cfg = load_json(DB_REGISTRO, {"canal_filtracao": None, "palavras": {}})
+    cfg["palavras"][palavra_passe.lower()] = cargo.id
+    save_json(DB_REGISTRO, cfg)
+    await interaction.response.send_message(f"✅ Palavra-passe `{palavra_passe.lower()}` associada ao cargo **{cargo.name}**.")
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    cfg = load_json(DB_REGISTRO, {})
+    canal_id = cfg.get("canal_filtracao")
+    if canal_id:
+        canal = member.guild.get_channel(canal_id)
+        if canal:
+            await canal.send(f"👋 Bem-vindo(a) {member.mention}! Digite a **palavra-passe** de acesso aqui no chat para liberar seu cargo.")
+
+@bot.event
+async def on_message(message: discord.Message):
+    await bot.process_commands(message)
+
+    if message.author.bot:
+        return
+
+    cfg = load_json(DB_REGISTRO, {})
+    canal_id = cfg.get("canal_filtracao")
+
+    if canal_id and message.channel.id == canal_id:
+        texto = message.content.strip().lower()
+        palavras = cfg.get("palavras", {})
+
+        cargo_id = None
+        for chave, cid in palavras.items():
+            if chave in texto:
+                cargo_id = cid
+                break
+
+        if cargo_id:
+            cargo = message.guild.get_role(cargo_id)
+            if cargo:
+                try:
+                    await message.author.add_roles(cargo)
+                    await message.channel.send(f"🎉 {message.author.mention}, cargo **{cargo.name}** entregue!", delete_after=8)
+                except discord.Forbidden:
+                    pass
+
+        try:
+            await message.delete()
+        except discord.Forbidden:
+            pass
+    
+    
 # Inicia o servidor Web
 keep_alive()
 
