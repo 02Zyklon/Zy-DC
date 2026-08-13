@@ -11,6 +11,14 @@ from keep_alive import keep_alive
 # =========================================================
 # CONFIGURAÇÃO E INICIALIZAÇÃO
 # =========================================================
+import os
+from google import genai
+from openai import OpenAI
+
+# Inicializa os clientes das IAs lendo as chaves do ambiente
+gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY")) if os.getenv("GEMINI_API_KEY") else None
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if os.getenv("OPENAI_API_KEY") else None
+
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -418,6 +426,75 @@ async def lembrete(interaction: discord.Interaction, minutos: int, texto: str):
 async def moeda(interaction: discord.Interaction):
     await interaction.response.defer()
     await interaction.followup.send(f"🎲 Resultado: **{random.choice(['Cara 🪙', 'Coroa 👑'])}**")
+
+# ==========================================
+# 🤖 COMANDOS DE INTELIGÊNCIA ARTIFICIAL
+# ==========================================
+
+@bot.tree.command(name="gemini", description="Pergunte algo para a IA do Google (Gemini).")
+async def gemini_cmd(interaction: discord.Interaction, pergunta: str):
+    """Responde dúvidas usando o modelo Gemini 2.5 Flash."""
+    await interaction.response.defer()
+
+    if not gemini_client:
+        await interaction.followup.send("⚠️ A chave `GEMINI_API_KEY` não foi configurada nas variáveis de ambiente.")
+        return
+
+    try:
+        response = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=pergunta
+        )
+        resposta = response.text
+
+        # Corta a resposta se ultrapassar o limite do Discord (2000 chars)
+        if len(resposta) > 1900:
+            resposta = resposta[:1900] + "...\n*(Resposta cortada devido ao limite de caracteres)*"
+
+        embed = discord.Embed(
+            title="✨ Resposta do Gemini",
+            description=resposta,
+            color=discord.Color.blurple()
+        )
+        embed.set_footer(text=f"Pergunta de: {interaction.user.display_name}")
+        await interaction.followup.send(embed=embed)
+
+    except Exception as e:
+        await interaction.followup.send(f"❌ Erro ao processar resposta do Gemini: `{e}`")
+
+
+@bot.tree.command(name="chatgpt", description="Pergunte algo para o ChatGPT (OpenAI).")
+async def chatgpt_cmd(interaction: discord.Interaction, pergunta: str):
+    """Responde dúvidas usando o ChatGPT (GPT-4o-mini)."""
+    await interaction.response.defer()
+
+    if not openai_client:
+        await interaction.followup.send("⚠️ A chave `OPENAI_API_KEY` não foi configurada nas variáveis de ambiente.")
+        return
+
+    try:
+        completion = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "Você é um assistente útil e amigável em um servidor do Discord."},
+                {"role": "user", "content": pergunta}
+            ]
+        )
+        resposta = completion.choices[0].message.content
+
+        if len(resposta) > 1900:
+            resposta = resposta[:1900] + "...\n*(Resposta cortada devido ao limite de caracteres)*"
+
+        embed = discord.Embed(
+            title="🤖 Resposta do ChatGPT",
+            description=resposta,
+            color=discord.Color.green()
+        )
+        embed.set_footer(text=f"Pergunta de: {interaction.user.display_name}")
+        await interaction.followup.send(embed=embed)
+
+    except Exception as e:
+        await interaction.followup.send(f"❌ Erro ao processar resposta do ChatGPT: `{e}`")
 
 # ==========================================
 # 🎨 COMANDOS DE GERENCIAMENTO E DECORAÇÃO DE CANAIS
