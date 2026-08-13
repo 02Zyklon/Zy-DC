@@ -313,8 +313,7 @@ async def reset_servidor(interaction: discord.Interaction):
 
     embed_regras = discord.Embed(
         title="📜 𝑫𝑰𝑑𝑬𝑻𝑑𝑰𝒁𝑬𝑺 𝑬 𝑑𝑬𝑮𝑑𝑨𝑺",
-        description=(
-            "**1. Respeito Mútuo:** Conduta limpa e sem ofensas gratuitas.\n"
+        description=("**1. Respeito Mútuo:** Conduta limpa e sem ofensas gratuitas.\n"
             "**2. Divulgação:** Proibida sem autorização prévia da moderação.\n"
             "**3. Compras & Suporte:** Use o canal de ticket para realizar seus pedidos."
         ),
@@ -339,10 +338,13 @@ async def reset_servidor(interaction: discord.Interaction):
     # ==========================================
     ow_publico_interativo = {
         role_everyone: discord.PermissionOverwrite(read_messages=False),
-        role_usuario: discord.PermissionOverwrite(read_messages=True, send_messages=True),
-        role_amd: discord.PermissionOverwrite(read_messages=True, send_messages=True),
-        role_amd_mod: discord.PermissionOverwrite(read_messages=True, send_messages=True),
     }
+    if role_usuario:
+        ow_publico_interativo[role_usuario] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+    if role_amd:
+        ow_publico_interativo[role_amd] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+    if role_amd_mod:
+        ow_publico_interativo[role_amd_mod] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
     if role_mod:
         ow_publico_interativo[role_mod] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
 
@@ -353,7 +355,7 @@ async def reset_servidor(interaction: discord.Interaction):
     # 💬 5. COMUNIDADE (CHAT LIBERADO)
     # ==========================================
     cat_dev = await guild.create_category("⚙ 𝑵𝑬𝑑𝑼𝑺 ┃ 𝑪𝑶𝑴𝑼𝑵𝑰𝑫𝑨𝑫𝑬 ›", overwrites=ow_publico_interativo)
-    c_geral = await guild.create_text_channel("💬・chat-geral", category=cat_dev)
+    await guild.create_text_channel("💬・chat-geral", category=cat_dev)
     await guild.create_text_channel("🤖・comandos-bot", category=cat_dev)
     await guild.create_text_channel("💻・dev-lounge", category=cat_dev)
     await guild.create_text_channel("🤝・parcerias", category=cat_dev)
@@ -363,8 +365,9 @@ async def reset_servidor(interaction: discord.Interaction):
     # ==========================================
     ow_amostradinhos = {
         role_everyone: discord.PermissionOverwrite(read_messages=False),
-        role_usuario: discord.PermissionOverwrite(read_messages=False),
     }
+    if role_usuario:
+        ow_amostradinhos[role_usuario] = discord.PermissionOverwrite(read_messages=False)
     if role_amd:
         ow_amostradinhos[role_amd] = discord.PermissionOverwrite(read_messages=True, send_messages=True, connect=True)
     if role_amd_mod:
@@ -379,8 +382,9 @@ async def reset_servidor(interaction: discord.Interaction):
     # Chat privado para líderes
     ow_so_amd = {
         role_everyone: discord.PermissionOverwrite(read_messages=False),
-        role_usuario: discord.PermissionOverwrite(read_messages=False),
     }
+    if role_usuario:
+        ow_so_amd[role_usuario] = discord.PermissionOverwrite(read_messages=False)
     if role_amd:
         ow_so_amd[role_amd] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
     if role_amd_mod:
@@ -393,8 +397,7 @@ async def reset_servidor(interaction: discord.Interaction):
     # Calls de Lines (5 slots)
     for i in range(1, 11):
         await guild.create_voice_channel(f"🎙・{i}ª-Line", user_limit=5, category=cat_ff)
-
-    # ==========================================
+        # ==========================================
     # 🔊 7. CALLS PÚBLICAS
     # ==========================================
     cat_calls = await guild.create_category("🔊 𝑪𝑨𝑳𝑳𝑺 ┃ 𝑷𝑼𝑩𝑳𝑰𝑪𝑨𝑺 ›", overwrites=ow_publico_interativo)
@@ -408,10 +411,13 @@ async def reset_servidor(interaction: discord.Interaction):
     # ==========================================
     ow_admin = {
         role_everyone: discord.PermissionOverwrite(read_messages=False),
-        role_usuario: discord.PermissionOverwrite(read_messages=False),
-        role_amd: discord.PermissionOverwrite(read_messages=False),
-        role_amd_mod: discord.PermissionOverwrite(read_messages=False),
     }
+    if role_usuario:
+        ow_admin[role_usuario] = discord.PermissionOverwrite(read_messages=False)
+    if role_amd:
+        ow_admin[role_amd] = discord.PermissionOverwrite(read_messages=False)
+    if role_amd_mod:
+        ow_admin[role_amd_mod] = discord.PermissionOverwrite(read_messages=False)
     if role_mod:
         ow_admin[role_mod] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
 
@@ -419,7 +425,7 @@ async def reset_servidor(interaction: discord.Interaction):
     await guild.create_text_channel("📡・bot-logs", category=cat_admin)
     await guild.create_text_channel("🛡・staff-only", category=cat_admin)
 
-    # Responde à interação original depois de criar tudo (usando followup)
+    # Resposta final usando followup
     await interaction.followup.send("✨ **Servidor reestruturado com sucesso!**", ephemeral=True)
 
 # ==========================================
