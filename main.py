@@ -324,6 +324,71 @@ async def painelticket(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, view=PainelTicketView())
 
 # ==========================================
+# 🧹 RESET E SETUP AUTOMÁTICO DE CANAIS
+# ==========================================
+
+@bot.tree.command(name="reset_servidor", description="⚠️ APAGA todos os canais/categorias e recria uma estrutura organizada.")
+@app_commands.checks.has_permissions(administrator=True)
+async def reset_servidor(interaction: discord.Interaction):
+    """Apaga a estrutura atual e cria um layout do zero."""
+    await interaction.response.send_message("⚙️ **Iniciando reestruturação do servidor...** Isso pode levar alguns segundos.", ephemeral=True)
+    
+    guild = interaction.guild
+
+    # 1. APAGAR TODOS OS CANAIS E CATEGORIAS EXISTENTES
+    for canal in guild.channels:
+        try:
+            await canal.delete()
+        except Exception:
+            pass
+
+    # 2. CRIAR A NOVA ESTRUTURA ORGANIZADA
+
+    # --- CATEGORIA: INFORMAÇÕES ---
+    cat_info = await guild.create_category("📌 ┃ INFORMAÇÕES")
+    c_regras = await guild.create_text_channel("📜┃ʀᴇɢʀᴀs", category=cat_info)
+    await guild.create_text_channel("📢┃ᴀɴᴜɴᴄɪᴏs", category=cat_info)
+    await guild.create_text_channel("🎁┃sᴏʀᴛᴇɪᴏs", category=cat_info)
+
+    # Mensagem fixada no canal de regras
+    embed_regras = discord.Embed(
+        title="📜 Regras do Servidor",
+        description=(
+            "**1.** Respeite todos os membros e a equipe de moderação.\n"
+            "**2.** Proibido spam, flood ou divulgação sem permissão.\n"
+            "**3.** Mantenha o respeito nos canais de voz e texto.\n"
+            "**4.** Siga as diretrizes do Discord."
+        ),
+        color=discord.Color.red()
+    )
+    await c_regras.send(embed=embed_regras)
+
+    # --- CATEGORIA: COMUNIDADE ---
+    cat_social = await guild.create_category("💬 ┃ COMUNIDADE")
+    c_geral = await guild.create_text_channel("💬┃ᴄʜᴀᴛ-ɢᴇʀᴀʟ", category=cat_social)
+    await guild.create_text_channel("🤖┃ᴄᴏᴍᴀɴᴅᴏs", category=cat_social)
+    await guild.create_text_channel("📸┃ᴍɪᴅɪᴀ", category=cat_social)
+
+    # --- CATEGORIA: SUPORTE ---
+    cat_suporte = await guild.create_category("🎫 ┃ ATENDIMENTO")
+    await guild.create_text_channel("🎫┃ᴛɪᴄᴋᴇᴛs", category=cat_suporte)
+
+    # --- CATEGORIA: CANAIS DE VOZ ---
+    cat_voz = await guild.create_category("🔊 ┃ CANAIS DE VOZ")
+    await guild.create_voice_channel("🔊┃ɢᴇʀᴀʟ", category=cat_voz)
+    await guild.create_voice_channel("🎮┃ᴊᴏɢᴏs 01", category=cat_voz)
+    await guild.create_voice_channel("🎮┃ᴊᴏɢᴏs 02", category=cat_voz)
+    await guild.create_voice_channel("💤┃ᴀsᴋ", category=cat_voz)
+
+    # Mensagem final avisando no chat geral criado
+    embed_sucesso = discord.Embed(
+        title="✨ Servidor Reestruturado com Sucesso!",
+        description="Todos os canais antigos foram apagados e a nova estrutura organizada foi aplicada.",
+        color=discord.Color.green()
+    )
+    await c_geral.send(embed=embed_sucesso)
+
+# ==========================================
 # 🛠️ UTILITÁRIOS
 # ==========================================
 @bot.tree.command(name="ping", description="Verifica a latência do bot")
