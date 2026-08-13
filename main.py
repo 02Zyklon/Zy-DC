@@ -323,70 +323,87 @@ async def painelticket(interaction: discord.Interaction):
     embed.set_footer(text="Zy-Bot • Sistema de Atendimento Automático")
     await interaction.response.send_message(embed=embed, view=PainelTicketView())
 
-# ==========================================
-# 🧹 RESET E SETUP AUTOMÁTICO DE CANAIS
-# ==========================================
+# ==========================================================
+# 🏗️ SETUP DO SERVIDOR (LETRAS UNICODE 100% CORRIGIDAS)
+# ==========================================================
 
-@bot.tree.command(name="reset_servidor", description="⚠️ APAGA todos os canais/categorias e recria uma estrutura organizada.")
+@bot.tree.command(name="setup_servidor", description="✨ Cria a estrutura de canais com visual Serif/Bold impecável.")
 @app_commands.checks.has_permissions(administrator=True)
-async def reset_servidor(interaction: discord.Interaction):
-    """Apaga a estrutura atual e cria um layout do zero."""
-    await interaction.response.send_message("⚙️ **Iniciando reestruturação do servidor...** Isso pode levar alguns segundos.", ephemeral=True)
+async def setup_servidor(interaction: discord.Interaction):
+    """Cria a estrutura de canais com todos os nomes estilizados corretamente."""
     
+    await interaction.response.defer(ephemeral=True)
     guild = interaction.guild
 
-    # 1. APAGAR TODOS OS CANAIS E CATEGORIAS EXISTENTES
-    for canal in guild.channels:
-        try:
-            await canal.delete()
-        except Exception:
-            pass
+    try:
+        # 🚨 1. FILTRAÇÃO
+        cat_filtracao = await guild.create_category("🚨 𝑭𝑰𝑳𝑻𝑹𝑨𝑪̧𝑨̃𝑶 ›")
+        await guild.create_text_channel("🚨・filtração", category=cat_filtracao)
 
-    # 2. CRIAR A NOVA ESTRUTURA ORGANIZADA
+        # 📌 2. INGRESSO / INSTITUCIONAL
+        cat_ing = await guild.create_category("📌 𝑾𝑬𝑳𝑪𝑶𝑴𝑬 ›")
+        c_regras = await guild.create_text_channel("📜・diretrizes", category=cat_ing)
+        await guild.create_text_channel("📢・anuncios", category=cat_ing)
+        await guild.create_text_channel("🎟・cargos-free", category=cat_ing)
 
-    # --- CATEGORIA: INFORMAÇÕES ---
-    cat_info = await guild.create_category("📌 ┃ INFORMAÇÕES")
-    c_regras = await guild.create_text_channel("📜┃ʀᴇɢʀᴀs", category=cat_info)
-    await guild.create_text_channel("📢┃ᴀɴᴜɴᴄɪᴏs", category=cat_info)
-    await guild.create_text_channel("🎁┃sᴏʀᴛᴇɪᴏs", category=cat_info)
+        # Embed com título corrigido
+        embed_regras = discord.Embed(
+            title="📜 𝑫𝑰𝑑𝑬𝑻𝑑𝑰𝒁𝑬𝑺 𝑬 𝑑𝑬𝑮𝑑𝑨𝑺",
+            description=(
+                "**1. Respeito Mútuo:** Conduta limpa e sem ofensas gratuitas.\n"
+                "**2. Divulgação:** Proibida sem autorização prévia da moderação.\n"
+                "**3. Compras & Suporte:** Use o canal de ticket para realizar seus pedidos."
+            ),
+            color=discord.Color.dark_red()
+        )
+        await c_regras.send(embed=embed_regras)
 
-    # Mensagem fixada no canal de regras
-    embed_regras = discord.Embed(
-        title="📜 Regras do Servidor",
-        description=(
-            "**1.** Respeite todos os membros e a equipe de moderação.\n"
-            "**2.** Proibido spam, flood ou divulgação sem permissão.\n"
-            "**3.** Mantenha o respeito nos canais de voz e texto.\n"
-            "**4.** Siga as diretrizes do Discord."
-        ),
-        color=discord.Color.red()
-    )
-    await c_regras.send(embed=embed_regras)
+        # 🛒 3. ZYKLON VENDAS
+        cat_loja = await guild.create_category("🛒 𝒁𝒀𝑲𝑳𝑶𝑵 𝑽𝑬𝑵𝑫𝑨𝑺 ›")
+        await guild.create_text_channel("💎・dimas-via-token", category=cat_loja)
+        await guild.create_text_channel("🎁・presentes-e-passes", category=cat_loja)
+        await guild.create_text_channel("🤖・bots-e-automaticos", category=cat_loja)
+        await guild.create_text_channel("👑・contas-ff", category=cat_loja)
+        await guild.create_text_channel("❤️・likes-ff", category=cat_loja)
+        await guild.create_text_channel("🛒・referencias", category=cat_loja)
+        await guild.create_text_channel("📜・termos-e-uso", category=cat_loja)
 
-    # --- CATEGORIA: COMUNIDADE ---
-    cat_social = await guild.create_category("💬 ┃ COMUNIDADE")
-    c_geral = await guild.create_text_channel("💬┃ᴄʜᴀᴛ-ɢᴇʀᴀʟ", category=cat_social)
-    await guild.create_text_channel("🤖┃ᴄᴏᴍᴀɴᴅᴏs", category=cat_social)
-    await guild.create_text_channel("📸┃ᴍɪᴅɪᴀ", category=cat_social)
+        # 🛠️ 4. ATENDIMENTO & TICKETS
+        cat_ticket = await guild.create_category("🛠️ 𝑨𝑻𝑬𝑵𝑫𝑰𝑑𝑬𝑵𝑻𝑶 ›")
+        await guild.create_text_channel("🎫・abrir-ticket", category=cat_ticket)
 
-    # --- CATEGORIA: SUPORTE ---
-    cat_suporte = await guild.create_category("🎫 ┃ ATENDIMENTO")
-    await guild.create_text_channel("🎫┃ᴛɪᴄᴋᴇᴛs", category=cat_suporte)
+        # 💬 5. COMUNIDADE
+        cat_dev = await guild.create_category("⚙ 𝑵𝑬𝑑𝑼𝑺 ┃ 𝑪𝑶𝑴𝑼𝑵𝑰𝑫𝑨𝑫𝑬 ›")
+        await guild.create_text_channel("💬・chat-geral", category=cat_dev)
+        await guild.create_text_channel("🤖・comandos-bot", category=cat_dev)
+        await guild.create_text_channel("💻・dev-lounge", category=cat_dev)
+        await guild.create_text_channel("🤝・parcerias", category=cat_dev)
 
-    # --- CATEGORIA: CANAIS DE VOZ ---
-    cat_voz = await guild.create_category("🔊 ┃ CANAIS DE VOZ")
-    await guild.create_voice_channel("🔊┃ɢᴇʀᴀʟ", category=cat_voz)
-    await guild.create_voice_channel("🎮┃ᴊᴏɢᴏs 01", category=cat_voz)
-    await guild.create_voice_channel("🎮┃ᴊᴏɢᴏs 02", category=cat_voz)
-    await guild.create_voice_channel("💤┃ᴀsᴋ", category=cat_voz)
+        # 🏆 6. GUILDA
+        cat_ff = await guild.create_category("🏆 𝑶𝑺 𝑨𝑴𝑶𝑺𝑻𝑑𝑨𝑫𝑰𝑵𝑯𝑶𝑺 ›")
+        await guild.create_text_channel("💬・chat-central", category=cat_ff)
+        await guild.create_text_channel("📌・avisos-linha-de-frente", category=cat_ff)
+        await guild.create_text_channel("🔒・chat-lideres-amd", category=cat_ff)
 
-    # Mensagem final avisando no chat geral criado
-    embed_sucesso = discord.Embed(
-        title="✨ Servidor Reestruturado com Sucesso!",
-        description="Todos os canais antigos foram apagados e a nova estrutura organizada foi aplicada.",
-        color=discord.Color.green()
-    )
-    await c_geral.send(embed=embed_sucesso)
+        for i in range(1, 11):
+            await guild.create_voice_channel(f"🎙・{i}ª-Line", user_limit=5, category=cat_ff)
+
+        # 🔊 7. CALLS PÚBLICAS
+        cat_calls = await guild.create_category("🔊 𝑪𝑨𝑳𝑳𝑺 ┃ 𝑷𝑼𝑩𝑳𝑰𝑪𝑨𝑺 ›")
+        await guild.create_voice_channel("🎧・Main-Lobby", category=cat_calls)
+        await guild.create_voice_channel("🎯・Squad-01", user_limit=4, category=cat_calls)
+        await guild.create_voice_channel("🎯・Squad-02", user_limit=4, category=cat_calls)
+        await guild.create_voice_channel("☕・Resenha-01", category=cat_calls)
+
+        # 🔒 8. ADMIN PANEL
+        cat_admin = await guild.create_category("🔒 𝑨𝑫𝑑𝑰𝑵 𝑷𝑨𝑵𝑬𝑳 ›")
+        await guild.create_text_channel("📡・bot-logs", category=cat_admin)
+        await guild.create_text_channel("🛡・staff-only", category=cat_admin)
+
+        await interaction.followup.send("✨ **Servidor gerado com sucesso e visual 100% corrigido!**", ephemeral=True)
+
+    except Exception as e:
+        await interaction.followup.send(f"❌ **Erro no setup:** `{e}`", ephemeral=True)
 
 # ==========================================
 # 🛠️ UTILITÁRIOS
