@@ -252,14 +252,16 @@ async def on_message(message: discord.Message):
             pass
 
 # ==========================================================
-# 🧹 RESET E SETUP COMPLETO (SEM NUMERAÇÕES DESNECESSÁRIAS)
+# 🧹 RESET E SETUP COMPLETO (COM DEFER PARA EVITAR TIMEOUT)
 # ==========================================================
 
-@bot.tree.command(name="reset_servidor", description="⚠️ RESET TOTAL: Aplica estrutura limpa, Zyklon Vendas e permissões.")
+@bot.tree.command(name="reset_servidor", description="⚠️ RESET TOTAL: Aplica estrutura limpa e Zyklon Vendas.")
 @app_commands.checks.has_permissions(administrator=True)
 async def reset_servidor(interaction: discord.Interaction):
-    """Apaga tudo e reestrutura o servidor aplicando nomes limpos e permissões."""
-    await interaction.response.send_message("⚙️ **Reformulando o servidor...**", ephemeral=True)
+    """Apaga tudo e reestrutura o servidor sem dar timeout no Discord."""
+    
+    # 🚨 CRUCIAL: Avisa o Discord para aguardar o processamento longo (evita "Aplicativo não respondeu")
+    await interaction.response.defer(ephemeral=True)
     
     guild = interaction.guild
 
@@ -417,13 +419,8 @@ async def reset_servidor(interaction: discord.Interaction):
     await guild.create_text_channel("📡・bot-logs", category=cat_admin)
     await guild.create_text_channel("🛡・staff-only", category=cat_admin)
 
-    # Notificação final
-    embed_sucesso = discord.Embed(
-        title="✨ 𝑺𝑬𝑑𝑽𝑰𝑫𝑶𝑑 𝑪𝑶𝑵𝑭𝑰𝑮𝑼𝑑𝑨𝑫𝑶",
-        description="A estrutura limpa e sem numerações desnecessárias foi aplicadas com sucesso!",
-        color=discord.Color.green()
-    )
-    await c_geral.send(embed=embed_sucesso)
+    # Responde à interação original depois de criar tudo (usando followup)
+    await interaction.followup.send("✨ **Servidor reestruturado com sucesso!**", ephemeral=True)
 
 # ==========================================
 # 🎫 SISTEMA DE TICKETS & ATENDIMENTO
