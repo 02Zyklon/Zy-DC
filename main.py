@@ -11,7 +11,6 @@ from keep_alive import keep_alive
 # =========================================================
 # CONFIGURAÇÃO E INICIALIZAÇÃO
 # =========================================================
-import os
 from google import genai
 from openai import OpenAI
 
@@ -53,7 +52,100 @@ async def on_ready():
     guild = discord.Object(id=GUILD_ID)
     bot.tree.copy_global_to(guild=guild)
     await bot.tree.sync(guild=guild)
+    
+    # Tornar as Views persistentes (não somem/quebram ao reiniciar)
+    bot.add_view(PainelTicketView())
+    bot.add_view(BotaoFecharTicket())
+    bot.add_view(ViewBotaoComprar())
+    
     print(f"🤖 Bot online e sincronizado com sucesso como: {bot.user}")
+
+# =========================================================
+# 🛒 SISTEMA DE VENDAS & TICKET INDIVIDUAL POR CANAL
+# =========================================================
+class BotaoComprar(discord.ui.Button):
+    def __init__(self):
+        super().__init__(
+            label="Comprar / Abrir Ticket", 
+            style=discord.ButtonStyle.green, 
+            emoji="🛒",
+            custom_id="btn_abrir_ticket_compra_individual"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        guild = interaction.guild
+        user = interaction.user
+        canal_origem = interaction.channel.name  # Nome do canal onde o botão foi clicado (ex: dimas-via-token)
+
+        # Formatação do nome do canal de ticket
+        nome_ticket = f"ticket-{user.name}-{canal_origem}".lower().replace(" ", "-")
+        
+        # Verifica se o usuário já tem um ticket desse canal aberto
+        ticket_existente = discord.utils.get(guild.text_channels, name=nome_ticket)
+        if ticket_existente:
+            return await interaction.response.send_message(
+                f"❌ Você já possui um ticket aberto para este produto: {ticket_existente.mention}", 
+                ephemeral=True
+            )
+
+        # Tenta localizar a categoria de atendimento ou usa a do próprio canal
+        cat_atendimento = discord.utils.get(guild.categories, name="🛠️ 𝑨𝑻𝑬𝑵𝑫𝑰𝑑𝑬𝑵𝑻𝑶 ›") or interaction.channel.category
+
+        # Permissões do canal privado
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            user: discord.PermissionOverwrite(read_messages=True, send_messages=True, attach_files=True),
+            guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_channels=True)
+        }
+
+        # Cria o canal de ticket privado
+        canal_ticket = await guild.create_text_channel(
+            name=nome_ticket,
+            category=cat_atendimento,
+            overwrites=overwrites
+        )
+
+        embed_ticket = discord.Embed(
+            title=f"🛒 Atendimento de Compra — {canal_origem.upper()}",
+            description=(
+                f"Olá {user.mention}, seja bem-vindo!\n\n"
+                f"📌 **Produto Selecionado:** `{canal_origem}`\n"
+                "Aguarde um momento. Um atendente ou administrador irá te responder em breve."
+            ),
+            color=discord.Color.green()
+        )
+        embed_ticket.set_footer(text=f"Usuário ID: {user.id}")
+
+        await canal_ticket.send(content=f"{user.mention}", embed=embed_ticket, view=BotaoFecharTicket())
+        await interaction.response.send_message(f"✅ Ticket criado com sucesso! Acesse: {canal_ticket.mention}", ephemeral=True)
+
+
+class ViewBotaoComprar(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(BotaoComprar())
+
+
+@bot.tree.command(name="fixar_produto", description="📌 Envia a imagem e detalhes do produto com o botão de ticket.")
+@app_commands.checks.has_permissions(administrator=True)
+async def fixar_produto(
+    interaction: discord.Interaction, 
+    titulo: str, 
+    descricao: str, 
+    url_imagem: str
+):
+    await interaction.response.defer(ephemeral=True)
+
+    embed = discord.Embed(
+        title=titulo,
+        description=descricao.replace("\\n", "\n"),
+        color=discord.Color.red()
+    )
+    embed.set_image(url=url_imagem)
+
+    # Envia a mensagem fixa no canal atual com o botão
+    await interaction.channel.send(embed=embed, view=ViewBotaoComprar())
+    await interaction.followup.send("✅ Anúncio do produto fixado com sucesso neste canal!", ephemeral=True)
 
 # =========================================================
 # 🪙 SISTEMA DE GOLDS (ECONOMIA)
@@ -252,7 +344,7 @@ async def on_message(message: discord.Message):
             pass
 
 # ==========================================
-# 🎫 SISTEMA DE TICKETS & ATENDIMENTO
+# 🎫 SISTEMA DE TICKETS GENERALIZADO
 # ==========================================
 class BotaoFecharTicket(discord.ui.View):
     def __init__(self):
@@ -324,7 +416,7 @@ async def painelticket(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, view=PainelTicketView())
 
 # ==========================================================
-# 🏗️ SETUP DO SERVIDOR (LETRAS UNICODE 100% CORRIGIDAS)
+# 🏗️ SETUP DO SERVIDOR
 # ==========================================================
 
 @bot.tree.command(name="setup_servidor", description="✨ Cria a estrutura de canais com visual Serif/Bold impecável.")
@@ -346,7 +438,6 @@ async def setup_servidor(interaction: discord.Interaction):
         await guild.create_text_channel("📢・anuncios", category=cat_ing)
         await guild.create_text_channel("🎟・cargos-free", category=cat_ing)
 
-        # Embed com título corrigido
         embed_regras = discord.Embed(
             title="📜 𝑫𝑰𝑑𝑬𝑻𝑑𝑰𝒁𝑬𝑺 𝑬 𝑑𝑬𝑮𝑑𝑨𝑺",
             description=(
@@ -453,13 +544,18 @@ async def ajuda(interaction: discord.Interaction):
         inline=False
     )
     embed.add_field(
+        name="🛒 Loja & Vendas", 
+        value="`/fixar_produto` `/painelticket`", 
+        inline=False
+    )
+    embed.add_field(
         name="🪙 Economia & Games", 
         value="`/carteira` `/daily` `/pay` `/rank` `/velha`", 
         inline=False
     )
     embed.add_field(
         name="🎫 Atendimento & Registro", 
-        value="`/painelticket` `/set_chat_filtracao` `/set_passe_cargo`", 
+        value="`/set_chat_filtracao` `/set_passe_cargo`", 
         inline=False
     )
     embed.add_field(
@@ -529,7 +625,6 @@ async def gemini_cmd(interaction: discord.Interaction, pergunta: str):
         )
         resposta = response.text
 
-        # Corta a resposta se ultrapassar o limite do Discord (2000 chars)
         if len(resposta) > 1900:
             resposta = resposta[:1900] + "...\n*(Resposta cortada devido ao limite de caracteres)*"
 
@@ -636,7 +731,6 @@ async def renomear_canal(
     """Renomeia qualquer canal existente."""
     await interaction.response.defer(ephemeral=True)
 
-    # Se não informar o canal, pega o canal onde o comando foi executado
     target_channel = canal or interaction.channel
 
     try:
@@ -654,7 +748,7 @@ async def renomear_canal(
         await interaction.followup.send("❌ Não tenho permissão para editar este canal.", ephemeral=True)
     except Exception as e:
         await interaction.followup.send(f"⚠️ Ocorreu um erro ao renomear: `{e}`", ephemeral=True)
-        
+
 # ==========================================
 # 🛡️ MODERAÇÃO E GESTÃO
 # ==========================================
