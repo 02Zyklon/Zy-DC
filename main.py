@@ -420,6 +420,83 @@ async def moeda(interaction: discord.Interaction):
     await interaction.followup.send(f"🎲 Resultado: **{random.choice(['Cara 🪙', 'Coroa 👑'])}**")
 
 # ==========================================
+# 🎨 COMANDOS DE GERENCIAMENTO E DECORAÇÃO DE CANAIS
+# ==========================================
+
+@bot.tree.command(name="criar_canal", description="Cria um novo canal com nome decorado e personalizado.")
+@app_commands.checks.has_permissions(manage_channels=True)
+@app_commands.choices(tipo=[
+    app_commands.Choice(name="Texto", value="texto"),
+    app_commands.Choice(name="Voz", value="voz")
+])
+async def criar_canal(
+    interaction: discord.Interaction, 
+    nome_decorado: str, 
+    tipo: app_commands.Choice[str], 
+    categoria: discord.CategoryChannel = None,
+    topico: str = None
+):
+    """Cria um canal de texto ou voz formatado."""
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        if tipo.value == "texto":
+            canal = await interaction.guild.create_text_channel(
+                name=nome_decorado,
+                category=categoria,
+                topic=topico
+            )
+            tipo_txt = "Texto 💬"
+        else:
+            canal = await interaction.guild.create_voice_channel(
+                name=nome_decorado,
+                category=categoria
+            )
+            tipo_txt = "Voz 🔊"
+
+        embed = discord.Embed(
+            title="✨ Canal Criado com Sucesso!",
+            description=f"**Canal:** {canal.mention}\n**Tipo:** {tipo_txt}\n**Categoria:** {categoria.name if categoria else 'Nenhuma'}",
+            color=discord.Color.green()
+        )
+        await interaction.followup.send(embed=embed)
+
+    except discord.Forbidden:
+        await interaction.followup.send("❌ Não tenho permissão de `Gerenciar Canais` para executar essa ação.", ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"⚠️ Ocorreu um erro ao criar o canal: `{e}`", ephemeral=True)
+
+
+@bot.tree.command(name="renomear_canal", description="Altera o nome de um canal para um novo formato/decorado.")
+@app_commands.checks.has_permissions(manage_channels=True)
+async def renomear_canal(
+    interaction: discord.Interaction, 
+    novo_nome_decorado: str, 
+    canal: discord.abc.GuildChannel = None
+):
+    """Renomeia qualquer canal existente."""
+    await interaction.response.defer(ephemeral=True)
+
+    # Se não informar o canal, pega o canal onde o comando foi executado
+    target_channel = canal or interaction.channel
+
+    try:
+        nome_antigo = target_channel.name
+        await target_channel.edit(name=novo_nome_decorado)
+
+        embed = discord.Embed(
+            title="🎨 Canal Renomeado!",
+            description=f"**Canal:** {target_channel.mention}\n**De:** `{nome_antigo}`\n**Para:** `{novo_nome_decorado}`",
+            color=discord.Color.blue()
+        )
+        await interaction.followup.send(embed=embed)
+
+    except discord.Forbidden:
+        await interaction.followup.send("❌ Não tenho permissão para editar este canal.", ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"⚠️ Ocorreu um erro ao renomear: `{e}`", ephemeral=True)
+        
+# ==========================================
 # 🛡️ MODERAÇÃO E GESTÃO
 # ==========================================
 @bot.tree.command(name="limpar", description="Apaga mensagens em massa")
