@@ -37,7 +37,6 @@ class DuelView(discord.ui.View):
         
         self.aceito = True
         self.stop()
-        # Desabilita botões
         for item in self.children:
             item.disabled = True
         await interaction.response.edit_message(content="⚔️ **O duelo foi aceito! O combate está começando...**", view=self)
@@ -50,7 +49,7 @@ class DuelView(discord.ui.View):
         self.stop()
         for item in self.children:
             item.disabled = True
-        await interaction.response.edit_message(content=f"🏳️ {self.desafiado.mention} recusou o desafio de duelo de {self.desafiante.mention}.", view=self)
+        await interaction.response.edit_message(content=f"🏳️ {self.desafiado.mention} recusou o desafio de duelo.", view=self)
 
 # --- CLASSE DA COG ---
 class PetRPG(commands.Cog):
@@ -86,6 +85,7 @@ class PetRPG(commands.Cog):
             "raça": base["nome_raça"],
             "level": 1,
             "xp": 0,
+            "golds": 100,  # Saldo Inicial de Bônus
             "last_daily": 0,
             "streak": 0,
             "midia": None,
@@ -103,7 +103,7 @@ class PetRPG(commands.Cog):
 
         embed = discord.Embed(
             title="🐣 NOVO PET ADOTADO!",
-            description=f"Parabéns {interaction.user.mention}! Você escolheu o elemento **{elem.upper()}**.\nSeu pet começou como **{base['nome_raça']}**!",
+            description=f"Parabéns {interaction.user.mention}! Você escolheu o elemento **{elem.upper()}**.\nSeu pet começou como **{base['nome_raça']}**!\n\n💰 **Bônus de Boas-Vindas:** +100 Golds adicionados à sua conta!",
             color=discord.Color.brand_green()
         )
         embed.add_field(name="❤️ HP", value=str(base["hp"]), inline=True)
@@ -113,7 +113,7 @@ class PetRPG(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     # 2. COMANDO: /foguinho (DAILY / CUIDAR DO PET)
-    @app_commands.command(name="foguinho", description="Alimente seu Pet diariamente para ganhar XP e subir de nível!")
+    @app_commands.command(name="foguinho", description="Alimente seu Pet diariamente para ganhar XP e Golds!")
     async def foguinho(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
         data = load_data()
@@ -122,6 +122,8 @@ class PetRPG(commands.Cog):
             return await interaction.response.send_message("❌ Você ainda não tem um Pet! Use `/pet_adotar` primeiro.", ephemeral=True)
 
         pet = data[user_id]
+        pet.setdefault("golds", 0)
+
         agora = int(time.time())
         tempo_24h = 86400
 
@@ -138,10 +140,14 @@ class PetRPG(commands.Cog):
             pet["streak"] += 1
 
         xp_ganho = random.randint(20, 50)
+        golds_ganhos = random.randint(30, 70)
+
         if pet["streak"] >= 7:
             xp_ganho = int(xp_ganho * 1.25)
+            golds_ganhos = int(golds_ganhos * 1.5)
 
         pet["xp"] += xp_ganho
+        pet["golds"] += golds_ganhos
         pet["last_daily"] = agora
 
         xp_necessario = pet["level"] * 100
@@ -150,7 +156,6 @@ class PetRPG(commands.Cog):
             pet["xp"] -= xp_necessario
             pet["level"] += 1
             subiu = True
-            
             pet["stats"]["hp_max"] += 10
             pet["stats"]["hp_atual"] = pet["stats"]["hp_max"]
             pet["stats"]["atq"] += 3
@@ -161,7 +166,7 @@ class PetRPG(commands.Cog):
 
         embed = discord.Embed(
             title=f"🔥 Você alimentou {pet['nome']}!",
-            description=f"🎉 **+{xp_ganho} XP** adquiridos!\n🔥 **Sequência (Streak):** {pet['streak']} dia(s)",
+            description=f"🎉 **+{xp_ganho} XP** | 💰 **+{golds_ganhos} Golds**\n🔥 **Sequência (Streak):** {pet['streak']} dia(s)",
             color=discord.Color.orange()
         )
         if subiu:
@@ -169,11 +174,12 @@ class PetRPG(commands.Cog):
 
         embed.add_field(name="Nível", value=str(pet["level"]), inline=True)
         embed.add_field(name="XP", value=f"{pet['xp']} / {pet['level'] * 100}", inline=True)
+        embed.add_field(name="💰 Saldo Atual", value=f"{pet['golds']} Golds", inline=True)
 
         await interaction.response.send_message(embed=embed)
 
     # 3. COMANDO: /pet_perfil
-    @app_commands.command(name="pet_perfil", description="Veja os status e detalhes do seu Pet!")
+    @app_commands.command(name="pet_perfil", description="Veja os status, saldos e detalhes do seu Pet!")
     async def pet_perfil(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
         data = load_data()
@@ -182,6 +188,7 @@ class PetRPG(commands.Cog):
             return await interaction.response.send_message("❌ Você ainda não tem um Pet! Use `/pet_adotar`.", ephemeral=True)
 
         pet = data[user_id]
+        pet.setdefault("golds", 0)
         st = pet["stats"]
         hist = pet.get("historico", {"vitorias": 0, "derrotas": 0})
 
@@ -197,7 +204,8 @@ class PetRPG(commands.Cog):
         embed.add_field(name="⚔️ ATQ", value=str(st['atq']), inline=True)
         embed.add_field(name="🛡️ DEF", value=str(st['defesa']), inline=True)
 
-        embed.add_field(name="📊 Histórico", value=f"🏆 Vitórias: `{hist['vitorias']}` | 💀 Derrotas: `{hist['derrotas']}`", inline=False)
+        embed.add_field(name="💰 Carteira", value=f"**{pet['golds']}** Golds", inline=True)
+        embed.add_field(name="📊 Histórico", value=f"🏆 Vitórias: `{hist['vitorias']}` | 💀 Derrotas: `{hist['derrotas']}`", inline=True)
 
         if pet["midia"]:
             embed.set_image(url=pet["midia"])
@@ -205,7 +213,7 @@ class PetRPG(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     # 4. COMANDO: /masmorra (PVE)
-    @app_commands.command(name="masmorra", description="Enfrente monstros em uma masmorra para ganhar XP!")
+    @app_commands.command(name="masmorra", description="Enfrente monstros em uma masmorra para ganhar XP e Golds!")
     @app_commands.choices(dificuldade=[
         app_commands.Choice(name="🟢 Caverna Tranquila (Fácil)", value="facil"),
         app_commands.Choice(name="🟡 Floresta Fechada (Média)", value="medio"),
@@ -219,12 +227,13 @@ class PetRPG(commands.Cog):
             return await interaction.response.send_message("❌ Você precisa ter um Pet! Use `/pet_adotar` primeiro.", ephemeral=True)
 
         pet = data[user_id]
+        pet.setdefault("golds", 0)
         st = pet["stats"]
 
         monstros = {
-            "facil": {"nome": "Slime Solitário", "hp": 50, "atq": 12, "def": 3, "elemento": "agua", "xp_min": 25, "xp_max": 45},
-            "medio": {"nome": "Lobo das Sombras", "hp": 100, "atq": 22, "def": 8, "elemento": "trovao", "xp_min": 55, "xp_max": 95},
-            "dificil": {"nome": "Dragão Flamejante", "hp": 170, "atq": 35, "def": 15, "elemento": "fogo", "xp_min": 110, "xp_max": 200}
+            "facil": {"nome": "Slime Solitário", "hp": 50, "atq": 12, "def": 3, "elemento": "agua", "xp_min": 25, "xp_max": 45, "gold_min": 20, "gold_max": 40},
+            "medio": {"nome": "Lobo das Sombras", "hp": 100, "atq": 22, "def": 8, "elemento": "trovao", "xp_min": 55, "xp_max": 95, "gold_min": 50, "gold_max": 90},
+            "dificil": {"nome": "Dragão Flamejante", "hp": 170, "atq": 35, "def": 15, "elemento": "fogo", "xp_min": 110, "xp_max": 200, "gold_min": 120, "gold_max": 220}
         }
 
         mob = monstros[dificuldade.value].copy()
@@ -239,7 +248,6 @@ class PetRPG(commands.Cog):
         rodada = 1
 
         while pet_hp > 0 and mob_hp > 0 and rodada <= 8:
-            # Turno do Pet
             dano_pet = max(3, int((st["atq"] * mult_pet) - (mob["def"] / 2)) + random.randint(-2, 3))
             mob_hp -= dano_pet
             
@@ -248,7 +256,6 @@ class PetRPG(commands.Cog):
                 logs.append(f"⚔️ **R{rodada}:** Seu Pet causou `{dano_pet}` de dano e eliminou o **{mob['nome']}**!")
                 break
 
-            # Turno do Monstro
             dano_mob = max(3, int((mob["atq"] * mult_mob) - (st["defesa"] / 2)) + random.randint(-2, 3))
             pet_hp -= dano_mob
             
@@ -261,13 +268,14 @@ class PetRPG(commands.Cog):
             rodada += 1
 
         vitoria = mob_hp <= 0
-
-        if "historico" not in pet:
-            pet["historico"] = {"vitorias": 0, "derrotas": 0}
+        pet.setdefault("historico", {"vitorias": 0, "derrotas": 0})
 
         if vitoria:
             xp_ganho = random.randint(mob["xp_min"], mob["xp_max"])
+            golds_ganhos = random.randint(mob["gold_min"], mob["gold_max"])
+            
             pet["xp"] += xp_ganho
+            pet["golds"] += golds_ganhos
             pet["historico"]["vitorias"] += 1
 
             xp_necessario = pet["level"] * 100
@@ -289,7 +297,7 @@ class PetRPG(commands.Cog):
                 description=f"**Desafio:** {dificuldade.name}\n\n" + "\n".join(logs),
                 color=discord.Color.green()
             )
-            embed.add_field(name="🎁 Recompensa", value=f"**+{xp_ganho} XP**", inline=False)
+            embed.add_field(name="🎁 Recompensas", value=f"**+{xp_ganho} XP** | 💰 **+{golds_ganhos} Golds**", inline=False)
             if subiu:
                 embed.add_field(name="🎊 LEVEL UP!", value=f"Seu Pet subiu para o **Nível {pet['level']}**!", inline=False)
         else:
@@ -301,34 +309,27 @@ class PetRPG(commands.Cog):
                 description=f"**Desafio:** {dificuldade.name}\n\n" + "\n".join(logs),
                 color=discord.Color.red()
             )
-            embed.set_footer(text="Use /foguinho para subir de nível e aumentar seu ATQ/DEF antes de tentar de novo!")
+            embed.set_footer(text="Use /foguinho para subir de nível e comprar itens na /loja!")
 
         await interaction.response.send_message(embed=embed)
 
     # 5. COMANDO: /duelar (PVP INTERATIVO)
-    @app_commands.command(name="duelar", description="Desafie outro jogador para um duelo de Pets!")
+    @app_commands.command(name="duelar", description="Desafie outro jogador para um duelo de Pets valendo Golds!")
     async def duelar(self, interaction: discord.Interaction, oponente: discord.Member):
         desafiante_id = str(interaction.user.id)
         oponente_id = str(oponente.id)
 
-        if oponente.bot:
-            return await interaction.response.send_message("❌ Você não pode duelar contra bots!", ephemeral=True)
-
-        if desafiante_id == oponente_id:
-            return await interaction.response.send_message("❌ Você não pode duelar contra você mesmo!", ephemeral=True)
+        if oponente.bot or desafiante_id == oponente_id:
+            return await interaction.response.send_message("❌ Oponente inválido para duelo!", ephemeral=True)
 
         data = load_data()
 
-        if desafiante_id not in data:
-            return await interaction.response.send_message("❌ Você precisa ter um Pet para duelar! Use `/pet_adotar`.", ephemeral=True)
+        if desafiante_id not in data or oponente_id not in data:
+            return await interaction.response.send_message("❌ Ambos os jogadores precisam ter um Pet para duelar!", ephemeral=True)
 
-        if oponente_id not in data:
-            return await interaction.response.send_message(f"❌ {oponente.mention} ainda não possui um Pet!", ephemeral=True)
-
-        # Envia convite de duelo com botões
         embed_desafio = discord.Embed(
             title="⚔️ DESAFIO DE DUELO PVP!",
-            description=f"{oponente.mention}, você foi desafiado por {interaction.user.mention} para um combate de Pets!\n\n**Aceita o duelo?**",
+            description=f"{oponente.mention}, você foi desafiado por {interaction.user.mention}!\nO vencedor levará **+50 Golds** bônus!\n\n**Aceita o duelo?**",
             color=discord.Color.gold()
         )
 
@@ -340,10 +341,11 @@ class PetRPG(commands.Cog):
         if not view.aceito:
             return
 
-        # Recarrega dados atualizados
         data = load_data()
         p1 = data[desafiante_id]
         p2 = data[oponente_id]
+        p1.setdefault("golds", 0)
+        p2.setdefault("golds", 0)
 
         p1_st, p2_st = p1["stats"], p2["stats"]
         p1_hp, p2_hp = p1_st["hp_max"], p2_st["hp_max"]
@@ -356,32 +358,28 @@ class PetRPG(commands.Cog):
         rodada = 1
 
         while p1_hp > 0 and p2_hp > 0 and rodada <= 10:
-            # Turno P1 -> P2
             dano1 = max(3, int((p1_st["atq"] * mult1) - (p2_st["defesa"] / 2)) + random.randint(-2, 3))
             p2_hp -= dano1
             if p2_hp <= 0:
                 p2_hp = 0
-                logs.append(f"⚔️ **R{rodada}:** {p1['nome']} deu `{dano1}` de dano e finalizou o pet de {oponente.display_name}!")
+                logs.append(f"⚔️ **R{rodada}:** {p1['nome']} deu `{dano1}` de dano e finalizou o duelo!")
                 break
 
-            # Turno P2 -> P1
             dano2 = max(3, int((p2_st["atq"] * mult2) - (p1_st["defesa"] / 2)) + random.randint(-2, 3))
             p1_hp -= dano2
             if p1_hp <= 0:
                 p1_hp = 0
-                logs.append(f"💥 **R{rodada}:** {p2['nome']} deu `{dano2}` de dano e finalizou o pet de {interaction.user.display_name}!")
+                logs.append(f"💥 **R{rodada}:** {p2['nome']} deu `{dano2}` de dano e finalizou o duelo!")
                 break
 
             logs.append(f"⚔️ **R{rodada}:** {interaction.user.display_name} deu `{dano1}` | {oponente.display_name} deu `{dano2}`")
             rodada += 1
 
-        # Definição do vencedor
         p1_venceu = p2_hp <= 0
         vencedor_user = interaction.user if p1_venceu else oponente
         vencedor_pet = p1 if p1_venceu else p2
         perdedor_pet = p2 if p1_venceu else p1
 
-        # Atualiza histórico e concede bônus de XP ao vencedor
         vencedor_pet.setdefault("historico", {"vitorias": 0, "derrotas": 0})
         perdedor_pet.setdefault("historico", {"vitorias": 0, "derrotas": 0})
 
@@ -389,20 +387,9 @@ class PetRPG(commands.Cog):
         perdedor_pet["historico"]["derrotas"] += 1
 
         xp_ganho = random.randint(30, 60)
+        golds_ganhos = 50
         vencedor_pet["xp"] += xp_ganho
-
-        # Level up check do vencedor
-        xp_necessario = vencedor_pet["level"] * 100
-        subiu = False
-        while vencedor_pet["xp"] >= xp_necessario:
-            vencedor_pet["xp"] -= xp_necessario
-            vencedor_pet["level"] += 1
-            subiu = True
-            vencedor_pet["stats"]["hp_max"] += 10
-            vencedor_pet["stats"]["hp_atual"] = vencedor_pet["stats"]["hp_max"]
-            vencedor_pet["stats"]["atq"] += 3
-            vencedor_pet["stats"]["defesa"] += 2
-            xp_necessario = vencedor_pet["level"] * 100
+        vencedor_pet["golds"] += golds_ganhos
 
         save_data(data)
 
@@ -411,11 +398,69 @@ class PetRPG(commands.Cog):
             description="\n".join(logs),
             color=discord.Color.gold()
         )
-        embed_resultado.add_field(name="🎁 Recompensa do Vencedor", value=f"**+{xp_ganho} XP** para {vencedor_pet['nome']}", inline=False)
-        if subiu:
-            embed_resultado.add_field(name="🎊 LEVEL UP!", value=f"{vencedor_pet['nome']} subiu para o **Nível {vencedor_pet['level']}**!", inline=False)
+        embed_resultado.add_field(name="🎁 Recompensa do Vencedor", value=f"**+{xp_ganho} XP** | 💰 **+{golds_ganhos} Golds**", inline=False)
 
         await interaction.followup.send(embed=embed_resultado)
+
+    # 6. COMANDO: /loja (COMPRA DE ITENS)
+    @app_commands.command(name="loja", description="Compre itens com seus Golds para melhorar seu Pet!")
+    @app_commands.choices(item=[
+        app_commands.Choice(name="🧪 Poção de Cura (+50 HP Atual) - 60 Golds", value="pocao"),
+        app_commands.Choice(name="🥩 Super Ração (+150 XP) - 100 Golds", value="racao"),
+        app_commands.Choice(name="⚔️ Amuleto de Força (+5 ATQ Permanente) - 250 Golds", value="amuleto")
+    ])
+    async def loja(self, interaction: discord.Interaction, item: app_commands.Choice[str]):
+        user_id = str(interaction.user.id)
+        data = load_data()
+
+        if user_id not in data:
+            return await interaction.response.send_message("❌ Você precisa ter um Pet para usar a loja! Use `/pet_adotar`.", ephemeral=True)
+
+        pet = data[user_id]
+        pet.setdefault("golds", 0)
+
+        precos = {"pocao": 60, "racao": 100, "amuleto": 250}
+        custo = precos[item.value]
+
+        if pet["golds"] < custo:
+            return await interaction.response.send_message(f"❌ Você não tem Golds suficientes! Seu saldo atual é de **{pet['golds']} Golds**.", ephemeral=True)
+
+        # Desconta saldo
+        pet["golds"] -= custo
+        msg_extra = ""
+
+        # Aplica efeito do item
+        if item.value == "pocao":
+            pet["stats"]["hp_atual"] = min(pet["stats"]["hp_max"], pet["stats"]["hp_atual"] + 50)
+            msg_extra = f"❤️ O HP do seu Pet foi restaurado para **{pet['stats']['hp_atual']}/{pet['stats']['hp_max']}**!"
+
+        elif item.value == "racao":
+            pet["xp"] += 150
+            msg_extra = "🎉 Seu Pet recebeu **+150 XP**!"
+            # Checa level up
+            xp_necessario = pet["level"] * 100
+            if pet["xp"] >= xp_necessario:
+                pet["xp"] -= xp_necessario
+                pet["level"] += 1
+                pet["stats"]["hp_max"] += 10
+                pet["stats"]["atq"] += 3
+                pet["stats"]["defesa"] += 2
+                msg_extra += f"\n🎊 **LEVEL UP!** Seu Pet alcançou o **Nível {pet['level']}**!"
+
+        elif item.value == "amuleto":
+            pet["stats"]["atq"] += 5
+            msg_extra = f"⚔️ O Ataque permanente do seu Pet aumentou para **{pet['stats']['atq']}**!"
+
+        save_data(data)
+
+        embed = discord.Embed(
+            title="🛒 COMPRA REALIZADA COM SUCESSO!",
+            description=f"Você comprou **{item.name.split(' - ')[0]}** por **{custo} Golds**!\n\n{msg_extra}",
+            color=discord.Color.green()
+        )
+        embed.set_footer(text=f"Saldo restante: {pet['golds']} Golds")
+
+        await interaction.response.send_message(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(PetRPG(bot))
