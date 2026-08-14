@@ -190,22 +190,55 @@ async def pay(interaction: discord.Interaction, destino: discord.Member, quantia
     economy.add_gold(destino.id, quantia)
     await interaction.response.send_message(f"💸 **{interaction.user.mention}** enviou **{quantia:,}** Golds 📀 para **{destino.mention}**!")
 
-@bot.tree.command(name="rank", description="Exibe o Ranking dos usuários mais ricos.")
+@bot.tree.command(name="rank", description="🏆 Exibe o TOP 10 dos membros mais ricos do servidor.")
 async def rank(interaction: discord.Interaction):
-    top_users = economy.get_rank(limit=10)
+    # 🚨 1. PRIMEIRA LINHA OBRIGATÓRIA: Evita o erro "O aplicativo não respondeu"
+    await interaction.response.defer()
 
-    embed = discord.Embed(title="🏆 Ranking de Golds - Top 10", color=discord.Color.gold())
-    medals = ["🥇", "🥈", "🥉"]
-    desc = ""
+    try:
+        # 📂 2. Carrega seu banco/JSON de moedas/Golds
+        # (Ajuste o nome do arquivo se for 'usuarios.json', 'banco.json', etc.)
+        with open("banco.json", "r", encoding="utf-8") as f:
+            dados = json.load(f)
 
-    for idx, (uid, gold) in enumerate(top_users, 1):
-        user = bot.get_user(int(uid))
-        name = user.display_name if user else f"Usuário ({uid})"
-        prefix = medals[idx-1] if idx <= 3 else f"`#{idx}`"
-        desc += f"{prefix} **{name}** — `{gold:,}` 📀\n"
+        if not dados:
+            return await interaction.followup.send("⚠️ Nenhum registro de moedas encontrado.")
 
-    embed.description = desc or "Sem dados econômicos."
-    await interaction.response.send_message(embed=embed)
+        # 📊 3. Ordena os usuários pelo maior saldo
+        # Considerando que seus dados sejam no formato { "user_id": {"golds": 100} } ou { "user_id": 100 }
+        ranking_ordenado = sorted(
+            dados.items(), 
+            key=lambda x: x[1].get("golds", 0) if isinstance(x[1], dict) else x[1], 
+            reverse=True
+        )[:10]
+
+        # 📜 4. Monta a Embed com o TOP 10
+        embed = discord.Embed(
+            title="🏆 𝑹𝑨𝑵𝑑 𝑫𝑶𝑺 𝑴𝑨𝑰𝑺 𝑹𝑰𝑪𝑶𝑺",
+            description="Confira quem são os donos do servidor em Golds:\n",
+            color=discord.Color.gold()
+        )
+
+        posicoes = ["🥇", "🥈", "🥉", "4º", "5º", "6º", "7º", "8º", "9º", "10º"]
+        
+        for index, (user_id, info) in enumerate(ranking_ordenado):
+            membro = interaction.guild.get_member(int(user_id))
+            nome = membro.display_name if membro else f"Usuário ({user_id})"
+            
+            golds = info.get("golds", 0) if isinstance(info, dict) else info
+            
+            embed.add_field(
+                name=f"{posicoes[index]} {nome}",
+                value=f"💰 `{golds:,}` Golds",
+                inline=False
+            )
+
+        # 🚨 5. IMPORTANTE: Use followup.send em vez de response.send_message
+        await interaction.followup.send(embed=embed)
+
+    except Exception as e:
+        # Em caso de erro, avisa com followup
+        await interaction.followup.send(f"❌ Ocorreu um erro ao carregar o rank: `{e}`")
 
 # =========================================================
 # 🎮 JOGO DA VELHA
