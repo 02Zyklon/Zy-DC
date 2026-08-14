@@ -196,36 +196,14 @@ import discord
 
 @bot.tree.command(name="rank", description="🏆 Exibe o TOP 10 dos membros mais ricos do servidor.")
 async def rank(interaction: discord.Interaction):
-    # 🚨 1. Responde à API imediatamente para não dar timeout
     await interaction.response.defer()
 
-    NOME_ARQUIVO = "banco.json"  # 👈 Altere aqui se o seu arquivo tiver outro nome (ex: "usuarios.json" ou "pets.json")
-
     try:
-        # 📂 2. Se o arquivo não existir, ele cria um arquivo novo e vazio na hora
-        if not os.path.exists(NOME_ARQUIVO):
-            with open(NOME_ARQUIVO, "w", encoding="utf-8") as f:
-                json.dump({}, f)
+        top_richest = economy.get_top_richest(10)
 
-        # 📖 3. Lê o arquivo JSON
-        with open(NOME_ARQUIVO, "r", encoding="utf-8") as f:
-            try:
-                dados = json.load(f)
-            except json.JSONDecodeError:
-                dados = {}
-
-        # Se a base estiver vazia
-        if not dados:
+        if not top_richest:
             return await interaction.followup.send("⚠️ Nenhum registro de moedas/Golds encontrado ainda.")
 
-        # 📊 4. Ordena os usuários pelo saldo (suporta tanto {'user_id': 100} quanto {'user_id': {'golds': 100}})
-        ranking_ordenado = sorted(
-            dados.items(),
-            key=lambda x: x[1].get("golds", 0) if isinstance(x[1], dict) else x[1],
-            reverse=True
-        )[:10]
-
-        # 📜 5. Monta o Embed do Ranking
         embed = discord.Embed(
             title="🏆 𝑹𝑨𝑵𝑲 𝑫𝑶𝑺 𝑴𝑨𝑰𝑺 𝑹𝑰𝑪𝑶𝑺",
             description="Confira os membros com maior saldo de Golds no servidor:\n",
@@ -234,11 +212,10 @@ async def rank(interaction: discord.Interaction):
 
         posicoes = ["🥇", "🥈", "🥉", "4º", "5º", "6º", "7º", "8º", "9º", "10º"]
 
-        for index, (user_id, info) in enumerate(ranking_ordenado):
+        for index, (user_id, info) in enumerate(top_richest):
             membro = interaction.guild.get_member(int(user_id))
             nome = membro.display_name if membro else f"Usuário ({user_id})"
-            
-            golds = info.get("golds", 0) if isinstance(info, dict) else info
+            golds = info.get("gold", 0) if isinstance(info, dict) else 0
 
             embed.add_field(
                 name=f"{posicoes[index]} {nome}",
