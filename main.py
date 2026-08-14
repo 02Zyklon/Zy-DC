@@ -878,6 +878,10 @@ async def main():
         if not token:
             print("❌ ERRO CRÍTICO: DISCORD_TOKEN não encontrado!")
             return
+        
+        # Carrega a Cog do RPG dinamicamente
+        await bot.load_extension("pet_rpg")
+        
         await bot.start(token)
 
 if __name__ == "__main__":
