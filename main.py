@@ -484,6 +484,33 @@ async def setup_servidor(interaction: discord.Interaction):
     except Exception as e:
         await interaction.followup.send(f"❌ **Erro no setup:** `{e}`", ephemeral=True)
 
+# ⚔️ 9. RPG YGGDRASIL
+        cat_rpg = await guild.create_category("⚔️ 𝑹𝑷𝑮 𝒀𝑮𝑮𝑫𝑑𝑨𝑺𝑰𝑳 ›")
+        
+        c_como_jogar = await guild.create_text_channel("📜・como-jogar", category=cat_rpg)
+        await guild.create_text_channel("🔥・foguinho-e-cassino", category=cat_rpg)
+        await guild.create_text_channel("🐉・masmorras", category=cat_rpg)
+        await guild.create_text_channel("🐾・meu-pet", category=cat_rpg)
+        await guild.create_text_channel("🏆・ostentacao-rank", category=cat_rpg)
+
+        # Mensagem explicativa no canal de tutorial
+        embed_rpg_guia = discord.Embed(
+            title="⚔️ 𝑩𝑬𝑴-𝑽𝑰𝑵𝑫𝑶 𝑨𝑶 𝑹𝑷𝑮 𝒀𝑮𝑮𝑫𝑑𝑨𝑺𝑰𝑳",
+            description=(
+                "Conquiste moedas, evolua seus pets e explore as profundezas da Yggdrasil!\n\n"
+                "📌 **Comandos Principais:**\n"
+                "• `/daily` — Colete sua recompensa diária de Golds.\n"
+                "• `/foguinho` — Teste sua sorte no jogo do foguinho.\n"
+                "• `/masmorra` — Enfrente monstros e ganhe recompensas.\n"
+                "• `/pet` — Cuide do seu companheiro de batalha.\n"
+                "• `/carteira` e `/rank` — Veja seu saldo e os mais ricos do servidor.\n"
+                "• `/velha` — Desafie outro membro para um X1."
+            ),
+            color=discord.Color.dark_purple()
+        )
+        embed_rpg_guia.set_footer(text="Aproveite e boa sorte nas batalhas!")
+        await c_como_jogar.send(embed=embed_rpg_guia)
+
 # ==========================================
 # 🛠️ UTILITÁRIOS
 # ==========================================
