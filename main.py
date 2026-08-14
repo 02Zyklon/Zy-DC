@@ -512,6 +512,59 @@ async def setup_servidor(interaction: discord.Interaction):
         await c_como_jogar.send(embed=embed_rpg_guia)
 
 # ==========================================
+# ⚔️ SETUP ISOLADO DO RPG YGGDRASIL
+# ==========================================
+@bot.tree.command(name="setup_rpg", description="⚔️ Cria apenas a categoria e os canais do RPG Yggdrasil.")
+@app_commands.checks.has_permissions(administrator=True)
+async def setup_rpg(interaction: discord.Interaction):
+    """Cria isoladamente a estrutura do RPG Yggdrasil."""
+    await interaction.response.defer(ephemeral=True)
+    guild = interaction.guild
+
+    # 🛑 1. Verifica se a categoria já existe para evitar duplicados
+    nome_categoria = "⚔️ 𝑹𝑷𝑮 𝒀𝑮𝑮𝑫𝑑𝑨𝑺𝑰𝑳 ›"
+    cat_existente = discord.utils.get(guild.categories, name=nome_categoria)
+
+    if cat_existente:
+        return await interaction.followup.send(
+            f"⚠️ A categoria **{nome_categoria}** já existe neste servidor! Apague-a primeiro se quiser recriar.", 
+            ephemeral=True
+        )
+
+    try:
+        # 🛡️ 2. Cria a categoria e os canais do RPG
+        cat_rpg = await guild.create_category(nome_categoria)
+
+        c_como_jogar = await guild.create_text_channel("📜・como-jogar", category=cat_rpg)
+        await guild.create_text_channel("🔥・foguinho-e-cassino", category=cat_rpg)
+        await guild.create_text_channel("🐉・masmorras", category=cat_rpg)
+        await guild.create_text_channel("🐾・meu-pet", category=cat_rpg)
+        await guild.create_text_channel("🏆・ostentacao-rank", category=cat_rpg)
+
+        # 📜 3. Envia o guia no canal de tutorial
+        embed_rpg_guia = discord.Embed(
+            title="⚔️ 𝑩𝑬𝑴-𝑽𝑰𝑵𝑫𝑶 𝑨𝑶 𝑹𝑷𝑮 𝒀𝑮𝑮𝑫𝑑𝑨𝑺𝑰𝑳",
+            description=(
+                "Conquiste moedas, evolua seus pets e explore as profundezas da Yggdrasil!\n\n"
+                "📌 **Comandos Principais:**\n"
+                "• `/daily` — Colete sua recompensa diária de Golds.\n"
+                "• `/foguinho` — Teste sua sorte no jogo do foguinho.\n"
+                "• `/masmorra` — Enfrente monstros e ganhe recompensas.\n"
+                "• `/pet` — Cuide do seu companheiro de batalha.\n"
+                "• `/carteira` e `/rank` — Veja seu saldo e os mais ricos do servidor.\n"
+                "• `/velha` — Desafie outro membro para um X1."
+            ),
+            color=discord.Color.dark_purple()
+        )
+        embed_rpg_guia.set_footer(text="Aproveite e boa sorte nas batalhas!")
+        await c_como_jogar.send(embed=embed_rpg_guia)
+
+        await interaction.followup.send("✨ **Categoria e canais do RPG Yggdrasil criados com sucesso!**", ephemeral=True)
+
+    except Exception as e:
+        await interaction.followup.send(f"❌ **Erro ao criar a categoria RPG:** `{e}`", ephemeral=True)
+
+# ==========================================
 # 🛠️ UTILITÁRIOS
 # ==========================================
 @bot.tree.command(name="ping", description="Verifica a latência do bot")
