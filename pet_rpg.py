@@ -5,10 +5,11 @@ import json
 import os
 import time
 import random
+import economy  # Importa o módulo centralizado de economia
 
 DATA_FILE = "pets.json"
 
-# --- AUXILIARES DO BANCO DE DADOS (JSON) ---
+# --- AUXILIARES DO BANCO DE DADOS DE PETS (JSON) ---
 def load_data():
     if not os.path.exists(DATA_FILE):
         return {}
@@ -85,7 +86,6 @@ class PetRPG(commands.Cog):
             "raça": base["nome_raça"],
             "level": 1,
             "xp": 0,
-            "golds": 100,  # Saldo Inicial de Bônus
             "last_daily": 0,
             "streak": 0,
             "midia": None,
@@ -101,9 +101,12 @@ class PetRPG(commands.Cog):
 
         save_data(data)
 
+        # Adiciona o bônus inicial no banco centralizado de Golds
+        economy.add_gold(interaction.user.id, 100)
+
         embed = discord.Embed(
             title="🐣 NOVO PET ADOTADO!",
-            description=f"Parabéns {interaction.user.mention}! Você escolheu o elemento **{elem.upper()}**.\nSeu pet começou como **{base['nome_raça']}**!\n\n💰 **Bônus de Boas-Vindas:** +100 Golds adicionados à sua conta!",
+            description=f"Parabéns {interaction.user.mention}! Você escolheu o elemento **{elem.upper()}**.\nSeu pet começou como **{base['nome_raça']}**!\n\n💰 **Bônus de Boas-Vindas:** +100 Golds adicionados à sua carteira!",
             color=discord.Color.brand_green()
         )
         embed.add_field(name="❤️ HP", value=str(base["hp"]), inline=True)
@@ -122,7 +125,6 @@ class PetRPG(commands.Cog):
             return await interaction.response.send_message("❌ Você ainda não tem um Pet! Use `/pet_adotar` primeiro.", ephemeral=True)
 
         pet = data[user_id]
-        pet.setdefault("golds", 0)
 
         agora = int(time.time())
         tempo_24h = 86400
@@ -147,8 +149,10 @@ class PetRPG(commands.Cog):
             golds_ganhos = int(golds_ganhos * 1.5)
 
         pet["xp"] += xp_ganho
-        pet["golds"] += golds_ganhos
         pet["last_daily"] = agora
+
+        # Adiciona Golds na economia global
+        novo_saldo = economy.add_gold(interaction.user.id, golds_ganhos)
 
         xp_necessario = pet["level"] * 100
         subiu = False
@@ -174,7 +178,7 @@ class PetRPG(commands.Cog):
 
         embed.add_field(name="Nível", value=str(pet["level"]), inline=True)
         embed.add_field(name="XP", value=f"{pet['xp']} / {pet['level'] * 100}", inline=True)
-        embed.add_field(name="💰 Saldo Atual", value=f"{pet['golds']} Golds", inline=True)
+        embed.add_field(name="💰 Saldo Geral", value=f"{novo_saldo:,} Golds", inline=True)
 
         await interaction.response.send_message(embed=embed)
 
@@ -188,9 +192,11 @@ class PetRPG(commands.Cog):
             return await interaction.response.send_message("❌ Você ainda não tem um Pet! Use `/pet_adotar`.", ephemeral=True)
 
         pet = data[user_id]
-        pet.setdefault("golds", 0)
         st = pet["stats"]
         hist = pet.get("historico", {"vitorias": 0, "derrotas": 0})
+        
+        # Busca o saldo global do usuário
+        saldo_golds = economy.get_gold(interaction.user.id)
 
         embed = discord.Embed(
             title=f"🐾 {pet['nome']} ({pet['raça']})",
@@ -204,7 +210,7 @@ class PetRPG(commands.Cog):
         embed.add_field(name="⚔️ ATQ", value=str(st['atq']), inline=True)
         embed.add_field(name="🛡️ DEF", value=str(st['defesa']), inline=True)
 
-        embed.add_field(name="💰 Carteira", value=f"**{pet['golds']}** Golds", inline=True)
+        embed.add_field(name="💰 Carteira Central", value=f"**{saldo_golds:,}** Golds", inline=True)
         embed.add_field(name="📊 Histórico", value=f"🏆 Vitórias: `{hist['vitorias']}` | 💀 Derrotas: `{hist['derrotas']}`", inline=True)
 
         if pet["midia"]:
@@ -227,7 +233,6 @@ class PetRPG(commands.Cog):
             return await interaction.response.send_message("❌ Você precisa ter um Pet! Use `/pet_adotar` primeiro.", ephemeral=True)
 
         pet = data[user_id]
-        pet.setdefault("golds", 0)
         st = pet["stats"]
 
         monstros = {
@@ -275,8 +280,10 @@ class PetRPG(commands.Cog):
             golds_ganhos = random.randint(mob["gold_min"], mob["gold_max"])
             
             pet["xp"] += xp_ganho
-            pet["golds"] += golds_ganhos
             pet["historico"]["vitorias"] += 1
+
+            # Adiciona Golds no sistema global de economia
+            novo_saldo = economy.add_gold(interaction.user.id, golds_ganhos)
 
             xp_necessario = pet["level"] * 100
             subiu = False
@@ -297,7 +304,7 @@ class PetRPG(commands.Cog):
                 description=f"**Desafio:** {dificuldade.name}\n\n" + "\n".join(logs),
                 color=discord.Color.green()
             )
-            embed.add_field(name="🎁 Recompensas", value=f"**+{xp_ganho} XP** | 💰 **+{golds_ganhos} Golds**", inline=False)
+            embed.add_field(name="🎁 Recompensas", value=f"**+{xp_ganho} XP** | 💰 **+{golds_ganhos} Golds**\n*(Saldo total: {novo_saldo:,} Golds)*", inline=False)
             if subiu:
                 embed.add_field(name="🎊 LEVEL UP!", value=f"Seu Pet subiu para o **Nível {pet['level']}**!", inline=False)
         else:
@@ -344,8 +351,6 @@ class PetRPG(commands.Cog):
         data = load_data()
         p1 = data[desafiante_id]
         p2 = data[oponente_id]
-        p1.setdefault("golds", 0)
-        p2.setdefault("golds", 0)
 
         p1_st, p2_st = p1["stats"], p2["stats"]
         p1_hp, p2_hp = p1_st["hp_max"], p2_st["hp_max"]
@@ -389,7 +394,9 @@ class PetRPG(commands.Cog):
         xp_ganho = random.randint(30, 60)
         golds_ganhos = 50
         vencedor_pet["xp"] += xp_ganho
-        vencedor_pet["golds"] += golds_ganhos
+
+        # Adiciona os Golds no sistema central para o vencedor
+        novo_saldo_vencedor = economy.add_gold(vencedor_user.id, golds_ganhos)
 
         save_data(data)
 
@@ -398,7 +405,11 @@ class PetRPG(commands.Cog):
             description="\n".join(logs),
             color=discord.Color.gold()
         )
-        embed_resultado.add_field(name="🎁 Recompensa do Vencedor", value=f"**+{xp_ganho} XP** | 💰 **+{golds_ganhos} Golds**", inline=False)
+        embed_resultado.add_field(
+            name="🎁 Recompensa do Vencedor", 
+            value=f"**+{xp_ganho} XP** | 💰 **+{golds_ganhos} Golds**\n*(Saldo atual: {novo_saldo_vencedor:,} Golds)*", 
+            inline=False
+        )
 
         await interaction.followup.send(embed=embed_resultado)
 
@@ -417,16 +428,17 @@ class PetRPG(commands.Cog):
             return await interaction.response.send_message("❌ Você precisa ter um Pet para usar a loja! Use `/pet_adotar`.", ephemeral=True)
 
         pet = data[user_id]
-        pet.setdefault("golds", 0)
-
         precos = {"pocao": 60, "racao": 100, "amuleto": 250}
         custo = precos[item.value]
 
-        if pet["golds"] < custo:
-            return await interaction.response.send_message(f"❌ Você não tem Golds suficientes! Seu saldo atual é de **{pet['golds']} Golds**.", ephemeral=True)
+        # Tenta debitar o valor do banco central de Golds
+        if not economy.remove_gold(interaction.user.id, custo):
+            saldo_atual = economy.get_gold(interaction.user.id)
+            return await interaction.response.send_message(
+                f"❌ Você não tem Golds suficientes! Seu saldo atual é de **{saldo_atual:,} Golds**.", 
+                ephemeral=True
+            )
 
-        # Desconta saldo
-        pet["golds"] -= custo
         msg_extra = ""
 
         # Aplica efeito do item
@@ -453,12 +465,14 @@ class PetRPG(commands.Cog):
 
         save_data(data)
 
+        saldo_restante =  economy.get_gold(interaction.user.id)
+
         embed = discord.Embed(
             title="🛒 COMPRA REALIZADA COM SUCESSO!",
             description=f"Você comprou **{item.name.split(' - ')[0]}** por **{custo} Golds**!\n\n{msg_extra}",
             color=discord.Color.green()
         )
-        embed.set_footer(text=f"Saldo restante: {pet['golds']} Golds")
+        embed.set_footer(text=f"Saldo restante na carteira: {saldo_restante:,} Golds")
 
         await interaction.response.send_message(embed=embed)
 
