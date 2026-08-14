@@ -7,6 +7,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from keep_alive import keep_alive
+import economy  # 🟢 Importação do módulo unificado de Economia
 
 # =========================================================
 # CONFIGURAÇÃO E INICIALIZAÇÃO
@@ -27,8 +28,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # ID do seu servidor no Discord (Guild)
 GUILD_ID = 1434359569718706320
 
-# Arquivos de armazenamento em JSON
-DB_ECONOMIA = "database_golds.json"
+# Arquivo de armazenamento de configurações de registro
 DB_REGISTRO = "config_registro.json"
 
 def load_json(file_path, default):
@@ -40,12 +40,6 @@ def load_json(file_path, default):
 def save_json(file_path, data):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
-
-def get_user_gold(db, user_id):
-    uid = str(user_id)
-    if uid not in db:
-        db[uid] = {"gold": 100}
-    return db[uid]
 
 @bot.event
 async def on_ready():
@@ -59,6 +53,20 @@ async def on_ready():
     bot.add_view(ViewBotaoComprar())
     
     print(f"🤖 Bot online e sincronizado com sucesso como: {bot.user}")
+
+# =========================================================
+# ⚡ COMANDO DE SINCRONIZAÇÃO DINÂMICA
+# =========================================================
+@bot.command(name="sync")
+@commands.is_owner()
+async def sync(ctx: commands.Context, spec: str = None):
+    """Sincroniza os comandos Slash dinamicamente (Uso: !sync ou !sync guild)"""
+    if spec == "guild":
+        synced = await bot.tree.sync(guild=ctx.guild)
+        await ctx.send(f"✅ **{len(synced)}** comandos sincronizados neste servidor!")
+    else:
+        synced = await bot.tree.sync()
+        await ctx.send(f"🌐 **{len(synced)}** comandos sincronizados globalmente!")
 
 # =========================================================
 # 🛒 SISTEMA DE VENDAS & TICKET INDIVIDUAL POR CANAL
@@ -75,12 +83,10 @@ class BotaoComprar(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         guild = interaction.guild
         user = interaction.user
-        canal_origem = interaction.channel.name  # Nome do canal onde o botão foi clicado (ex: dimas-via-token)
+        canal_origem = interaction.channel.name
 
-        # Formatação do nome do canal de ticket
         nome_ticket = f"ticket-{user.name}-{canal_origem}".lower().replace(" ", "-")
         
-        # Verifica se o usuário já tem um ticket desse canal aberto
         ticket_existente = discord.utils.get(guild.text_channels, name=nome_ticket)
         if ticket_existente:
             return await interaction.response.send_message(
@@ -88,17 +94,14 @@ class BotaoComprar(discord.ui.Button):
                 ephemeral=True
             )
 
-        # Tenta localizar a categoria de atendimento ou usa a do próprio canal
         cat_atendimento = discord.utils.get(guild.categories, name="🛠️ 𝑨𝑻𝑬𝑵𝑫𝑰𝑑𝑬𝑵𝑻𝑶 ›") or interaction.channel.category
 
-        # Permissões do canal privado
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
             user: discord.PermissionOverwrite(read_messages=True, send_messages=True, attach_files=True),
             guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_channels=True)
         }
 
-        # Cria o canal de ticket privado
         canal_ticket = await guild.create_text_channel(
             name=nome_ticket,
             category=cat_atendimento,
@@ -143,18 +146,16 @@ async def fixar_produto(
     )
     embed.set_image(url=url_imagem)
 
-    # Envia a mensagem fixa no canal atual com o botão
     await interaction.channel.send(embed=embed, view=ViewBotaoComprar())
     await interaction.followup.send("✅ Anúncio do produto fixado com sucesso neste canal!", ephemeral=True)
 
 # =========================================================
-# 🪙 SISTEMA DE GOLDS (ECONOMIA)
+# 🪙 SISTEMA DE GOLDS (ECONOMIA CONECTADA AO economy.py)
 # =========================================================
 @bot.tree.command(name="carteira", description="Exibe o seu saldo atual de Golds.")
 async def carteira(interaction: discord.Interaction, usuario: discord.Member = None):
     target = usuario or interaction.user
-    db = load_json(DB_ECONOMIA, {})
-    data = get_user_gold(db, target.id)
+    saldo = economy.get_gold(target.id)
 
     embed = discord.Embed(
         title="🏛️ Banco Central Zy",
@@ -162,58 +163,46 @@ async def carteira(interaction: discord.Interaction, usuario: discord.Member = N
         color=discord.Color.gold()
     )
     embed.set_thumbnail(url=target.display_avatar.url)
-    embed.add_field(name="💰 Saldo em Golds", value=f"`{data['gold']:,}` 📀", inline=False)
+    embed.add_field(name="💰 Saldo em Golds", value=f"`{saldo:,}` 📀", inline=False)
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="daily", description="Resgate sua recompensa diária de Golds.")
 async def daily(interaction: discord.Interaction):
-    db = load_json(DB_ECONOMIA, {})
-    user_data = get_user_gold(db, interaction.user.id)
-
     reward = random.randint(250, 600)
-    user_data["gold"] += reward
-    save_json(DB_ECONOMIA, db)
+    novo_saldo = economy.add_gold(interaction.user.id, reward)
 
     embed = discord.Embed(
         title="🎁 Recompensa Diária Coletada!",
-        description=f"Você recebeu **+{reward}** Golds 📀!",
+        description=f"Você recebeu **+{reward:,}** Golds 📀!",
         color=discord.Color.green()
     )
-    embed.add_field(name="Novo Saldo", value=f"`{user_data['gold']:,}` 📀")
+    embed.add_field(name="Novo Saldo", value=f"`{novo_saldo:,}` 📀")
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="pay", description="Transfira Golds para outro usuário.")
 async def pay(interaction: discord.Interaction, destino: discord.Member, quantia: int):
-    if quantia <= 0 or destino.id == interaction.user.id:
-        return await interaction.response.send_message("❌ Operação inválida.", ephemeral=True)
+    if quantia <= 0 or destino.bot or destino.id == interaction.user.id:
+        return await interaction.response.send_message("❌ Operação ou valor inválido!", ephemeral=True)
 
-    db = load_json(DB_ECONOMIA, {})
-    autor_data = get_user_gold(db, interaction.user.id)
-    destino_data = get_user_gold(db, destino.id)
-
-    if autor_data["gold"] < quantia:
+    if not economy.remove_gold(interaction.user.id, quantia):
         return await interaction.response.send_message("❌ Saldo insuficiente!", ephemeral=True)
 
-    autor_data["gold"] -= quantia
-    destino_data["gold"] += quantia
-    save_json(DB_ECONOMIA, db)
-
+    economy.add_gold(destino.id, quantia)
     await interaction.response.send_message(f"💸 **{interaction.user.mention}** enviou **{quantia:,}** Golds 📀 para **{destino.mention}**!")
 
 @bot.tree.command(name="rank", description="Exibe o Ranking dos usuários mais ricos.")
 async def rank(interaction: discord.Interaction):
-    db = load_json(DB_ECONOMIA, {})
-    sorted_users = sorted(db.items(), key=lambda x: x[1].get("gold", 0), reverse=True)[:10]
+    top_users = economy.get_rank(limit=10)
 
     embed = discord.Embed(title="🏆 Ranking de Golds - Top 10", color=discord.Color.gold())
     medals = ["🥇", "🥈", "🥉"]
     desc = ""
 
-    for idx, (uid, data) in enumerate(sorted_users, 1):
+    for idx, (uid, gold) in enumerate(top_users, 1):
         user = bot.get_user(int(uid))
         name = user.display_name if user else f"Usuário ({uid})"
         prefix = medals[idx-1] if idx <= 3 else f"`#{idx}`"
-        desc += f"{prefix} **{name}** — `{data.get('gold', 0):,}` 📀\n"
+        desc += f"{prefix} **{name}** — `{gold:,}` 📀\n"
 
     embed.description = desc or "Sem dados econômicos."
     await interaction.response.send_message(embed=embed)
@@ -414,7 +403,6 @@ async def painelticket(interaction: discord.Interaction):
     )
     embed.set_footer(text="Zy-Bot • Sistema de Atendimento Automático")
     await interaction.response.send_message(embed=embed, view=PainelTicketView())
-
 # ==========================================================
 # 🏗️ SETUP DO SERVIDOR
 # ==========================================================
@@ -550,7 +538,7 @@ async def ajuda(interaction: discord.Interaction):
     )
     embed.add_field(
         name="🪙 Economia & Games", 
-        value="`/carteira` `/daily` `/pay` `/rank` `/velha`", 
+        value="`/carteira` `/daily` `/pay` `/rank` `/velha` `/pet` `/foguinho` `/masmorra`", 
         inline=False
     )
     embed.add_field(
@@ -886,3 +874,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+        
