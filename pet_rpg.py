@@ -377,6 +377,121 @@ class PetRPG(commands.Cog):
             embed.set_footer(text="Acesse a /loja e compre uma poção para reanimar seu Pet!")
 
         await interaction.response.send_message(embed=embed)
+
+        # ==========================================
+    # 🐉 SISTEMA DE WORLD BOSS (RAID EVENT)
+    # ==========================================
+
+    @app_commands.command(name="set_boss", description="[ADMIN] Invoca um novo World Boss para o servidor!")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def set_boss(self, interaction: discord.Interaction, nome: str, hp_total: int, premio_golds: int):
+        boss_data = {
+            "nome": nome,
+            "hp_max": hp_total,
+            "hp_atual": hp_total,
+            "premio_golds": premio_golds,
+            "ativo": True,
+            "dano_jogadores": {} # {user_id: {"nome": display_name, "dano": int}}
+        }
+        save_boss(boss_data)
+
+        embed = discord.Embed(
+            title="🔥 UM NOVO WORLD BOSS APARECEU!",
+            description=(
+                f" Um inimigo colossal despertou em Yggdrasil!\n\n"
+                f"👹 **Boss:** `{nome}`\n"
+                f"❤️ **Vida Total:** `{hp_total:,}` HP\n"
+                f"💰 **Pool de Recompensas:** `{premio_golds:,}` Golds\n\n"
+                "⚔️ Use o comando `/atacar_boss` para dar dano e garantir sua fatia do prêmio!"
+            ),
+            color=discord.Color.dark_red()
+        )
+        await interaction.response.send_message(embed=embed)
+
+
+    @app_commands.command(name="atacar_boss", description="Ataque o World Boss ativo e acumule dano no ranking!")
+    @app_commands.checks.cooldown(1, 600, key=lambda i: i.user.id) # Cooldown de 10 minutos
+    async def atacar_boss(self, interaction: discord.Interaction):
+        user_id = str(interaction.user.id)
+        pets = load_data() # Carrega o banco dos pets
+
+        if user_id not in pets:
+            return await interaction.response.send_message("❌ Você precisa adotar um Pet primeiro com `/pet_adotar`!", ephemeral=True) #[span_0](start_span)[span_0](end_span)
+
+        pet = pets[user_id]
+        st = pet["stats"]
+
+        # Checa se o pet não está zerado de vida[span_1](start_span)[span_1](end_span)
+        if st.get("hp_atual", st["hp_max"]) <= 0:
+            return await interaction.response.send_message("💀 Seu Pet está desmaiado! Use uma **🧪 Poção de Cura** na `/loja` antes de encarar o Boss.", ephemeral=True) #[span_2](start_span)[span_2](end_span)
+
+        boss = load_boss()
+        if not boss or not boss.get("ativo", False):
+            return await interaction.response.send_message("😴 Não há nenhum World Boss ativo no momento. Aguarde a administração invocar um!", ephemeral=True)
+
+        # Cálculo do Ataque com chance de Crítico[span_3](start_span)[span_3](end_span)
+        dano_base = random.randint(st["atq"], st["atq"] * 2)
+        chance_crit = min(st["agi"], 50) #[span_4](start_span)[span_4](end_span)
+        is_crit = random.randint(1, 100) <= chance_crit
+        
+        crit_msg = ""
+        if is_crit:
+            dano_base = int(dano_base * 1.5)
+            crit_msg = "🎯 **CRÍTICO!** "
+
+        # Aplica o dano no Boss
+        boss["hp_atual"] -= dano_base
+        
+        # Registra no ranking individual
+        if user_id not in boss["dano_jogadores"]:
+            boss["dano_jogadores"][user_id] = {"nome": interaction.user.display_name, "dano": 0}
+        
+        boss["dano_jogadores"][user_id]["dano"] += dano_base
+
+        # Morte do Boss
+        if boss["hp_atual"] <= 0:
+            boss["hp_atual"] = 0
+            boss["ativo"] = False
+            save_boss(boss)
+
+            # Distribuição dos Golds proporcional ao dano causado
+            total_dano = sum(p["dano"] for p in boss["dano_jogadores"].values())
+            premio_pool = boss["premio_golds"]
+
+            resumo_recompensas = []
+            for uid, info in boss["dano_jogadores"].items():
+                porcentagem = info["dano"] / total_dano
+                golds_ganhos = int(premio_pool * porcentagem)
+                economy.add_gold(int(uid), golds_ganhos) #[span_5](start_span)[span_5](end_span)
+                resumo_recompensas.append(f"• **{info['nome']}**: `{info['dano']:,}` dano ({porcentagem:.1%}) ➔ **+{golds_ganhos:,} Golds** 💰")
+
+            embed_vitoria = discord.Embed(
+                title=f"🎉 O WORLD BOSS {boss['nome'].upper()} FOI DERROTADO!",
+                description=(
+                    f"⚔️ **Ataque Final por:** {interaction.user.mention} ({crit_msg}`{dano_base:,}` de dano!)\n\n"
+                    "🏆 **DISTRIBUIÇÃO DE RECOMPENSAS:**\n" + "\n".join(resumo_recompensas)
+                ),
+                color=discord.Color.gold()
+            )
+            return await interaction.response.send_message(embed=embed_vitoria)
+
+        # Se o Boss ainda estiver vivo
+        save_boss(boss)
+
+        porcentagem_hp = (boss["hp_atual"] / boss["hp_max"]) * 100
+        dano_acumulado = boss["dano_jogadores"][user_id]["dano"]
+
+        embed = discord.Embed(
+            title=f"⚔️ ATAQUE AO WORLD BOSS!",
+            description=(
+                f"{interaction.user.mention} enviou **{pet['nome']}** para a batalha!\n\n"
+                f"{crit_msg}Dano Causado: `{dano_base:,}`\n"
+                f"🩸 **HP Restante do Boss:** `{boss['hp_atual']:,}` / `{boss['hp_max']:,}` ({porcentagem_hp:.1f}%)\n"
+                f"📊 **Seu Dano Acumulado:** `{dano_acumulado:,}`"
+            ),
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed)
     
     # 5. COMANDO: /duelar (PVP INTERATIVO)
     @app_commands.command(name="duelar", description="Desafie outro jogador para um duelo de Pets valendo Golds!")
