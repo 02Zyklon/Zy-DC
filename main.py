@@ -635,36 +635,125 @@ async def serverinfo(interaction: discord.Interaction):
         embed.set_thumbnail(url=guild.icon.url)
     await interaction.followup.send(embed=embed)
 
-@bot.tree.command(name="ajuda", description="Lista todos os comandos do bot")
+# ==========================================
+# 📚 MENU DE AJUDA INTERATIVO (SEM IMAGENS)
+# ==========================================
+
+class HelpSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="Utilitários & IAs", description="Comandos gerais, perfil e Inteligências Artificiais", emoji="🛠️", value="util"),
+            discord.SelectOption(label="Economia & RPG Pets", description="Golds, carteira, masmorras, duelos e loja", emoji="🪙", value="eco"),
+            discord.SelectOption(label="Vendas & Tickets", description="Sistemas de suporte e anúncios de produtos", emoji="🛒", value="vendas"),
+            discord.SelectOption(label="Atendimento & Registro", description="Configurações de suporte e filtração por senha", emoji="🎫", value="atendimento"),
+            discord.SelectOption(label="Moderação & Gestão", description="Comandos de administração do servidor", emoji="🛡️", value="mod"),
+        ]
+        super().__init__(placeholder="📂 Selecione uma categoria para explorar...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        escolha = self.values[0]
+
+        if escolha == "util":
+            embed = discord.Embed(
+                title="🛠️ Utilitários & Inteligências Artificiais",
+                description=(
+                    "• `/gemini` — Pergunta algo para a IA do Google (Gemini 2.5 Flash)\n"
+                    "• `/chatgpt` — Pergunta algo para o ChatGPT (GPT-4o-mini)\n"
+                    "• `/ping` — Exibe a latência de conexão do bot\n"
+                    "• `/userinfo` — Mostra datas, ID e cargos de um membro\n"
+                    "• `/serverinfo` — Mostra informações completas do servidor\n"
+                    "• `/avatar` — Baixa e exibe a foto de perfil de um membro\n"
+                    "• `/embed` — Cria uma caixa de mensagem formatada\n"
+                    "• `/enquete` — Inicia uma votação por reações (👍 / 👎)\n"
+                    "• `/lembrete` — Programa um aviso com contagem regressiva\n"
+                    "• `/moeda` — Sorteia entre Cara ou Coroa"
+                ),
+                color=discord.Color.blue()
+            )
+
+        elif escolha == "eco":
+            embed = discord.Embed(
+                title="🪙 Economia & RPG Yggdrasil",
+                description=(
+                    "• `/carteira` — Vê o seu saldo individual em Golds\n"
+                    "• `/daily` — Coleta a recompensa diária de moedas\n"
+                    "• `/pay` — Transfere moedas para outro usuário\n"
+                    "• `/rank` — Exibe o TOP 10 dos membros mais ricos\n"
+                    "• `/velha` — Desafia um membro para o Jogo da Velha\n"
+                    "• `/pet_adotar` — Escolha o seu Pet inicial (Fogo/Água/Trovão)\n"
+                    "• `/foguinho` — Alimenta e dá XP diário ao seu Pet\n"
+                    "• `/pet_perfil` — Exibe os status, vida e vitórias do seu Pet\n"
+                    "• `/masmorra` — Enfrenta monstros em batalhas por recompensas\n"
+                    "• `/duelar` — Desafia outro jogador valendo prêmio em Golds\n"
+                    "• `/loja` — Compra poções, rações de XP e amuletos"
+                ),
+                color=discord.Color.gold()
+            )
+
+        elif escolha == "vendas":
+            embed = discord.Embed(
+                title="🛒 Loja & Vendas",
+                description=(
+                    "• `/fixar_produto` — Fixa o anúncio de um produto com botão de compra\n"
+                    "• `/painelticket` — Envia o painel fixo de suporte e atendimento"
+                ),
+                color=discord.Color.green()
+            )
+
+        elif escolha == "atendimento":
+            embed = discord.Embed(
+                title="🎫 Atendimento & Registro por Senha",
+                description=(
+                    "• `/set_chat_filtracao` — Configura o canal onde os membros digitam a senha\n"
+                    "• `/set_passe_cargo` — Associa uma palavra-passe a um cargo automático"
+                ),
+                color=discord.Color.purple()
+            )
+
+        elif escolha == "mod":
+            embed = discord.Embed(
+                title="🛡️ Moderação & Gestão do Servidor",
+                description=(
+                    "• `/limpar` — Apaga mensagens em massa no canal\n"
+                    "• `/limparuser` — Apaga mensagens de um usuário específico\n"
+                    "• `/kick` — Expulsa um membro do servidor\n"
+                    "• `/ban` — Bane um membro do servidor\n"
+                    "• `/mute` — Silencia um membro temporariamente por minutos\n"
+                    "• `/unmute` — Remove o silêncio de um membro\n"
+                    "• `/warn` — Aplica uma advertência privada no PV do usuário\n"
+                    "• `/addcargo` — Adiciona um cargo a um membro\n"
+                    "• `/removecargo` — Remove um cargo de um membro\n"
+                    "• `/nick` — Altera o apelido de um membro no servidor\n"
+                    "• `/lock` — Tranca o canal atual para os membros\n"
+                    "• `/unlock` — Destranca o canal atual\n"
+                    "• `/anuncio` — Envia uma mensagem oficial formatada\n"
+                    "• `/sorteio` — Sorteia um membro aleatório do servidor"
+                ),
+                color=discord.Color.red()
+            )
+
+        embed.set_footer(text="Zy-Bot • Selecione qualquer categoria no menu acima para navegar.")
+        await interaction.response.edit_message(embed=embed, view=self.view)
+
+class HelpView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=180)
+        self.add_item(HelpSelect())
+
+@bot.tree.command(name="ajuda", description="Central de ajuda interativa do bot")
 async def ajuda(interaction: discord.Interaction):
-    await interaction.response.defer()
-    embed = discord.Embed(title="🤖 Central de Comandos | Zy-Bot", color=discord.Color.gold())
-    embed.add_field(
-        name="🛠️ Utilitários", 
-        value="`/ping` `/userinfo` `/serverinfo` `/avatar` `/embed` `/enquete` `/lembrete` `/moeda`", 
-        inline=False
+    embed = discord.Embed(
+        title="🤖 Central de Comandos | Zy-Bot",
+        description=(
+            "Seja bem-vindo à central de ajuda do servidor!\n\n"
+            "📌 **Como usar:**\n"
+            "Selecione uma das opções no **menu suspenso abaixo** para abrir a lista completa de comandos e suas respectivas explicações."
+        ),
+        color=discord.Color.dark_theme()
     )
-    embed.add_field(
-        name="🛒 Loja & Vendas", 
-        value="`/fixar_produto` `/painelticket`", 
-        inline=False
-    )
-    embed.add_field(
-        name="🪙 Economia & Games", 
-        value="`/carteira` `/daily` `/pay` `/rank` `/velha` `/pet` `/foguinho` `/masmorra`", 
-        inline=False
-    )
-    embed.add_field(
-        name="🎫 Atendimento & Registro", 
-        value="`/set_chat_filtracao` `/set_passe_cargo`", 
-        inline=False
-    )
-    embed.add_field(
-        name="🛡️ Moderação & Gestão", 
-        value="`/limpar` `/limparuser` `/kick` `/ban` `/mute` `/unmute` `/warn` `/addcargo` `/removecargo` `/nick` `/lock` `/unlock` `/anuncio` `/sorteio`", 
-        inline=False
-    )
-    await interaction.followup.send(embed=embed)
+    embed.set_footer(text="Escolha uma categoria abaixo para navegar.")
+
+    await interaction.response.send_message(embed=embed, view=HelpView())
 
 @bot.tree.command(name="avatar", description="Manda o avatar de um membro")
 async def avatar(interaction: discord.Interaction, membro: discord.Member = None):
