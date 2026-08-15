@@ -8,6 +8,14 @@ from discord.ext import commands
 from discord import app_commands
 from keep_alive import keep_alive
 import economy  # 🟢 Importação do módulo unificado de Economia
+import logging
+
+# Configura logs visíveis em tempo real no Discloud
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()]
+)
 
 # =========================================================
 # CONFIGURAÇÃO E INICIALIZAÇÃO
