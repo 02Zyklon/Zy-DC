@@ -328,6 +328,10 @@ async def on_member_join(member: discord.Member):
             await canal.send(f"👋 Bem-vindo(a) {member.mention}! Digite a **palavra-passe** de acesso aqui no chat para liberar seu cargo.")
 
 @bot.event
+async def on_app_command_completion(interaction: discord.Interaction, command: app_commands.Command):
+    print(f"📌 [COMANDO EXECUTADO] /{command.name} por {interaction.user} (ID: {interaction.user.id})", flush=True)
+
+@bot.event
 async def on_message(message: discord.Message):
     await bot.process_commands(message)
 
