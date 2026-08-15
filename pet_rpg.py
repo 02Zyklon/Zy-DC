@@ -5,9 +5,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-# Presumindo que 'economy' e as funções utilitárias do pet estejam importadas no seu ecossistema
+# Presumindo que 'economy' esteja importado no seu ecossistema
 # import economy
-# from data_manager import load_data, save_data
 
 # ==========================================
 # GERENCIAMENTO DE DADOS DO WORLD BOSS
@@ -27,6 +26,25 @@ def save_boss(data):
     with open(BOSS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
+
+# ==========================================
+# GERENCIAMENTO DE DADOS DOS PETS (pets.json)
+# ==========================================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PETS_FILE = os.path.join(BASE_DIR, "pets.json")
+
+def load_data():
+    if not os.path.exists(PETS_FILE):
+        return {}
+    with open(PETS_FILE, "r", encoding="utf-8") as f:
+        try:
+            return json.load(f)
+        except json.JSONDecodeError:
+            return {}
+
+def save_data(data):
+    with open(PETS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 # ==========================================
 # BANCO DE 40 CENÁRIOS E MONSTROS DE GUILDA
