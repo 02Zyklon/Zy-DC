@@ -16,7 +16,20 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[logging.StreamHandler()]
 )
+PETS_FILE = "pets.json"
 
+def load_data():
+    if not os.path.exists(PETS_FILE):
+        return {}
+    with open(PETS_FILE, "r", encoding="utf-8") as f:
+        try:
+            return json.load(f)
+        except json.JSONDecodeError:
+            return {}
+
+def save_data(data):
+    with open(PETS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 # =========================================================
 # CONFIGURAÇÃO E INICIALIZAÇÃO
 # =========================================================
