@@ -7,6 +7,21 @@ import time
 import random
 import economy  # Importa o módulo centralizado de economia
 
+BOSS_FILE = "boss_data.json"
+
+def load_boss():
+    if not os.path.exists(BOSS_FILE):
+        return {}
+    with open(BOSS_FILE, "r", encoding="utf-8") as f:
+        try:
+            return json.load(f)
+        except json.JSONDecodeError:
+            return {}
+
+def save_boss(data):
+    with open(BOSS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
 DATA_FILE = "pets.json"
 
 # --- AUXILIARES DO BANCO DE DADOS DE PETS (JSON) ---
