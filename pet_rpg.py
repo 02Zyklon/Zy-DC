@@ -492,6 +492,199 @@ class PetRPG(commands.Cog):
             color=discord.Color.red()
         )
         await interaction.response.send_message(embed=embed)
+
+import random
+import discord
+from discord import app_commands
+from discord.ext import commands
+
+# BANCO EXPANDIDO COM 40 CENÁRIOS E MONSTROS DE GUILDA
+CENARIOS_GUILDA = [
+    # --- CENÁRIOS ORIGINAIS (1 a 20) ---
+    {"bioma": "Pântano Viscoso", "mob": "Goblin do Pântano", "hp": 120, "atq": 25, "def": 5, "xp": 120, "gold": 90},
+    {"bioma": "Floresta dos Cogumelos", "mob": "Esporo Mutante", "hp": 100, "atq": 28, "def": 3, "xp": 110, "gold": 80},
+    {"bioma": "Caverna de Cristal", "mob": "Besouro Geoda", "hp": 180, "atq": 20, "def": 15, "xp": 140, "gold": 110},
+    {"bioma": "Ruínas Esquecidas", "mob": "Guardião de Pedra", "hp": 220, "atq": 30, "def": 20, "xp": 180, "gold": 150},
+    {"bioma": "Vale dos Trovões", "mob": "Águia Elétrica", "hp": 110, "atq": 35, "def": 4, "xp": 130, "gold": 100},
+    {"bioma": "Cemitério Abandonado", "mob": "Esqueleto Cavaleiro", "hp": 140, "atq": 27, "def": 8, "xp": 125, "gold": 95},
+    {"bioma": "Mina Abandonada", "mob": "Kobold Minerador", "hp": 90, "atq": 22, "def": 4, "xp": 95, "gold": 120},
+    {"bioma": "Cume Gelado", "mob": "Lobo das Neves", "hp": 130, "atq": 29, "def": 6, "xp": 135, "gold": 100},
+    {"bioma": "Ninho de Serpes", "mob": "Filhote de Serpe", "hp": 160, "atq": 33, "def": 10, "xp": 160, "gold": 130},
+    {"bioma": "Esgotos da Cidade", "mob": "Rato Gigante Mutado", "hp": 85, "atq": 20, "def": 2, "xp": 85, "gold": 70},
+    {"bioma": "Abismo das Sombras", "mob": "Sombra Vagante", "hp": 150, "atq": 36, "def": 7, "xp": 170, "gold": 140},
+    {"bioma": "Deserto Escaldante", "mob": "Escorpião do Deserto", "hp": 140, "atq": 31, "def": 12, "xp": 145, "gold": 115},
+    {"bioma": "Manguezal Escuro", "mob": "Jacaré-Tigre", "hp": 170, "atq": 34, "def": 11, "xp": 165, "gold": 135},
+    {"bioma": "Templo Profanado", "mob": "Cultista das Sombras", "hp": 125, "atq": 38, "def": 5, "xp": 150, "gold": 160},
+    {"bioma": "Vulcão Ativo", "mob": "Elementar de Magma", "hp": 200, "atq": 40, "def": 14, "xp": 210, "gold": 180},
+    {"bioma": "Santuário Antigo", "mob": "Treant Corrompido", "hp": 240, "atq": 25, "def": 18, "xp": 190, "gold": 140},
+    {"bioma": "Litoral Esquecido", "mob": "Sereia Abissal", "hp": 135, "atq": 32, "def": 8, "xp": 140, "gold": 125},
+    {"bioma": "Planalto dos Ecos", "mob": "Harpia Sorrateira", "hp": 115, "atq": 30, "def": 5, "xp": 120, "gold": 105},
+    {"bioma": "Masmorra Esquecida", "mob": "Golem de Ferro", "hp": 250, "atq": 28, "def": 22, "xp": 220, "gold": 170},
+    {"bioma": "Portal do Vazio", "mob": "Aberração Estelar", "hp": 210, "atq": 42, "def": 12, "xp": 240, "gold": 200},
+
+    # --- NOVOS CENÁRIOS (21 a 40) ---
+    {"bioma": "Labirinto de Espinhos", "mob": "Mímico Vegetal", "hp": 165, "atq": 33, "def": 9, "xp": 155, "gold": 130},
+    {"bioma": "Vale dosOssos", "mob": "Quimera Reanimada", "hp": 230, "atq": 39, "def": 16, "xp": 225, "gold": 175},
+    {"bioma": "Pico Tempestuoso", "mob": "Roc dos Céus", "hp": 190, "atq": 37, "def": 11, "xp": 195, "gold": 145},
+    {"bioma": "Abismo Coralino", "mob": "Kraken Juvenil", "hp": 260, "atq": 31, "def": 20, "xp": 230, "gold": 190},
+    {"bioma": "Catacumbas Reais", "mob": "Mumia do Faraó", "hp": 175, "atq": 35, "def": 13, "xp": 180, "gold": 210},
+    {"bioma": "Floresta Espectral", "mob": "Fogo-Fátuo Ancião", "hp": 110, "atq": 44, "def": 4, "xp": 165, "gold": 120},
+    {"bioma": "Forja Obscura", "mob": "Autômato Defeituoso", "hp": 215, "atq": 36, "def": 17, "xp": 205, "gold": 165},
+    {"bioma": "Tundra Iluminada", "mob": "Yeti das Cavernas", "hp": 240, "atq": 38, "def": 15, "xp": 220, "gold": 160},
+    {"bioma": "Pântano de Ácido", "mob": "Lesma Devoradora", "hp": 280, "atq": 24, "def": 21, "xp": 210, "gold": 140},
+    {"bioma": "Ninho de Aracnídeos", "mob": "Aranha Viúva Tântrica", "hp": 130, "atq": 41, "def": 7, "xp": 175, "gold": 150},
+    {"bioma": "Ilha Voadora", "mob": "Gárgula do Vento", "hp": 185, "atq": 32, "def": 14, "xp": 185, "gold": 155},
+    {"bioma": "Deserto de Cristal", "mob": "Serpente das Dunas", "hp": 155, "atq": 36, "def": 10, "xp": 160, "gold": 135},
+    {"bioma": "Jardim Corrompido", "mob": "Planta Carnívora Gigante", "hp": 200, "atq": 34, "def": 12, "xp": 190, "gold": 125},
+    {"bioma": "Caverna Ecoante", "mob": "Morcego Sônico", "hp": 105, "atq": 39, "def": 5, "xp": 145, "gold": 115},
+    {"bioma": "Templo da Névoa", "mob": "Monge Fantasma", "hp": 145, "atq": 37, "def": 8, "xp": 170, "gold": 180},
+    {"bioma": " cratera Meteórica", "mob": "Verme Estelar", "hp": 250, "atq": 43, "def": 19, "xp": 250, "gold": 220},
+    {"bioma": "Fenda Marítima", "mob": "Tubarão Martelo Mutante", "hp": 205, "atq": 40, "def": 13, "xp": 215, "gold": 170},
+    {"bioma": "Vilarejo Fantasma", "mob": "Banshee Lacerante", "hp": 120, "atq": 45, "def": 6, "xp": 180, "gold": 165},
+    {"bioma": "Fortaleza Esquecida", "mob": "Cavaleiro sem Cabeça", "hp": 220, "atq": 42, "def": 18, "xp": 240, "gold": 200},
+    {"bioma": "Núcleo de Yggdrasil", "mob": "Avatar Corrompido", "hp": 300, "atq": 48, "def": 25, "xp": 300, "gold": 280}
+]
+
+# INTERFACE COM BOTÕES PARA DECISÃO RÁPIDA
+class ExplorarView(discord.ui.View):
+    def __init__(self, user_id, pet_data, cenario, progresso_diario):
+        super().__init__(timeout=60)
+        self.user_id = str(user_id)
+        self.pet_data = pet_data
+        self.cenario = cenario
+        self.progresso = progresso_diario
+
+    @discord.ui.button(label="⚔️ Atacar Monstro", style=discord.ButtonStyle.danger)
+    async def atacar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if str(interaction.user.id) != self.user_id:
+            return await interaction.response.send_message("❌ Esta exploração não é sua!", ephemeral=True)
+
+        st = self.pet_data["stats"]
+        mob = self.cenario
+        
+        # Sistema de Batalha Simulado
+        dano_pet = max(5, st["atq"] - mob["def"]) + random.randint(1, 10)
+        dano_mob = max(5, mob["atq"] - st["defesa"]) + random.randint(1, 10)
+
+        # Atualiza uso diário
+        self.pet_data["exploracao_hoje"] = self.progresso + 1
+        
+        if dano_pet >= (mob["hp"] / 3): # Pet venceu a rodada de exploração
+            xp_ganho = mob["xp"]
+            gold_ganho = mob["gold"]
+            
+            self.pet_data["xp"] += xp_ganho
+            
+            # --- NOVA ESCALA DE XP PÓS-NÍVEL 20 ---
+            lvl = self.pet_data["level"]
+            xp_necessario = (lvl * 300) if lvl >= 20 else (lvl * 100) #[span_1](start_span)[span_1](end_span)
+            
+            subiu = False
+            if self.pet_data["xp"] >= xp_necessario:
+                self.pet_data["xp"] -= xp_necessario
+                self.pet_data["level"] += 1
+                subiu = True
+
+            economy.add_gold(interaction.user.id, gold_ganho) #[span_2](start_span)[span_2](end_span)
+            save_data(data) # Salva estado dos pets
+
+            txt_resultado = f"✅ **Vitória!** Você derrotou o **{mob['mob']}**!\n🎁 **Recompensas:** +{xp_ganho} XP | +{gold_ganho} Golds"
+            if subiu:
+                txt_resultado += f"\n🎊 **LEVEL UP!** Seu pet alcançou o **Nível {self.pet_data['level']}**!"
+            
+            # Se ainda não bateu o limite de 10, puxa o próximo encontro automaticamente
+            if self.pet_data["exploracao_hoje"] < 10:
+                novo_cenario = random.choice(CENARIOS_GUILDA)
+                prox_view = ExplorarView(self.user_id, self.pet_data, novo_cenario, self.pet_data["exploracao_hoje"])
+                
+                embed_prox = discord.Embed(
+                    title=f"🗺️ Exploração em Cadeia [{self.pet_data['exploracao_hoje']}/10]",
+                    description=f"{txt_resultado}\n\n---\n🌳 **Novo Bioma Encontrado:** `{novo_cenario['bioma']}`\n👹 **Monstro:** `{novo_cenario['mob']}` (XP: {novo_cenario['xp']} | Gold: {novo_cenario['gold']})\n\nO que deseja fazer?",
+                    color=discord.Color.green()
+                )
+                await interaction.response.edit_message(embed=embed_prox, view=prox_view)
+            else:
+                embed_fim = discord.Embed(
+                    title="🏁 Exploração Diária Concluída!",
+                    description=f"{txt_resultado}\n\n✨ Você atingiu o limite de **10/10 explorações hoje**. Volte amanhã!",
+                    color=discord.Color.gold()
+                )
+                await interaction.response.edit_message(embed=embed_fim, view=None)
+
+        else: # Derrota na exploração
+            save_data(data)
+            embed_derrota = discord.Embed(
+                title="💀 Derrotado na Exploração...",
+                description=f"O **{mob['mob']}** era forte demais! Seu pet recuou para a guilda para se recuperar.",
+                color=discord.Color.red()
+            )
+            await interaction.response.edit_message(embed=embed_derrota, view=None)
+
+    @discord.ui.button(label="🏃 Continuar Explorando", style=discord.ButtonStyle.secondary)
+    async def pular(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if str(interaction.user.id) != self.user_id:
+            return await interaction.response.send_message("❌ Esta exploração não é sua!", ephemeral=True)
+
+        self.pet_data["exploracao_hoje"] = self.progresso + 1
+        save_data(data)
+
+        if self.pet_data["exploracao_hoje"] < 10:
+            novo_cenario = random.choice(CENARIOS_GUILDA)
+            prox_view = ExplorarView(self.user_id, self.pet_data, novo_cenario, self.pet_data["exploracao_hoje"])
+            
+            embed = discord.Embed(
+                title=f"🗺️ Exploração em Cadeia [{self.pet_data['exploracao_hoje']}/10]",
+                description=f"🏃 Você ignorou o perigo anterior e avançou no caminho...\n\n🌳 **Novo Bioma:** `{novo_cenario['bioma']}`\n👹 **Monstro:** `{novo_cenario['mob']}` (XP: {novo_cenario['xp']} | Gold: {novo_cenario['gold']})\n\nO que deseja fazer?",
+                color=discord.Color.blue()
+            )
+            await interaction.response.edit_message(embed=embed, view=prox_view)
+        else:
+            embed_fim = discord.Embed(
+                title="🏁 Exploração Diária Concluída!",
+                description="✨ Você ignorou o encontro e atingiu o limite de **10/10 explorações hoje**.",
+                color=discord.Color.gold()
+            )
+            await interaction.response.edit_message(embed=embed_fim, view=None)
+
+
+# COMANDO PRINCIPAL SLASH
+@app_commands.command(name="xplorar", description="[GUILDA] Explore ecossistemas para batalhar e subir de nível rápido!")
+async def xplorar(self, interaction: discord.Interaction):
+    user_id = str(interaction.user.id)
+    pets = load_data()
+
+    if user_id not in pets:
+        return await interaction.response.send_message("❌ Adote um Pet com `/pet_adotar` primeiro!", ephemeral=True)[span_3](start_span)[span_3](end_span)
+
+    pet = pets[user_id]
+    
+    # REQUIREMENT 1: REQUISITO DE NÍVEL 15
+    if pet["level"] < 15:
+        return await interaction.response.send_message(
+            f"🔒 **Acesso Negado!** A exploração da guilda é extrema. Seu Pet precisa ser **Nível 15+** (Nível atual: {pet['level']}).", 
+            ephemeral=True
+        )
+
+    # REQUISITO 2: VERIFICAÇÃO DO LIMITE DIÁRIO
+    hoje = pet.get("exploracao_hoje", 0)
+    if hoje >= 10:
+        return await interaction.response.send_message("⏳ Você já completou suas **10 explorações diárias**. Volte amanhã!", ephemeral=True)
+
+    cenario_inicial = random.choice(CENARIOS_GUILDA)
+    view = ExplorarView(user_id, pet, cenario_inicial, hoje)
+
+    embed = discord.Embed(
+        title=f"🗺️ Exploração da Guilda [{hoje + 1}/10]",
+        description=(
+            f"📍 **Ambiente:** `{cenario_inicial['bioma']}`\n"
+            f"👹 **Monstro Localizado:** `{cenario_inicial['mob']}`\n"
+            f"⭐ **XP Estimado:** `{cenario_inicial['xp']}` | 💰 **Gold Estimado:** `{cenario_inicial['gold']}`\n\n"
+            "Escolha se deseja batalhar agora ou continuar explorando o mapa:"
+        ),
+        color=discord.Color.dark_purple()
+    )
+
+    await interaction.response.send_message(embed=embed, view=view)
     
     # 5. COMANDO: /duelar (PVP INTERATIVO)
     @app_commands.command(name="duelar", description="Desafie outro jogador para um duelo de Pets valendo Golds!")
