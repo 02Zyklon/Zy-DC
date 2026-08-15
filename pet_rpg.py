@@ -370,13 +370,13 @@ class PetRPG(commands.Cog):
 
         await interaction.response.send_message(embed=embed, view=view)
 
-    # 3. COMANDO: /loja
+    # 3. COMANDO: /loja (LOJA DE ITENS COM REAJUSTE DE +60 GOLDS)
     @app_commands.command(name="loja", description="Compre itens com seus Golds para melhorar seu Pet!")
     @app_commands.choices(item=[
-        app_commands.Choice(name="🧪 Poção de Cura (+50 HP) - 66 Golds", value="pocao"),
-        app_commands.Choice(name="🥩 Super Ração (+150 XP) - 110 Golds", value="racao"),
-        app_commands.Choice(name="⚔️ Amuleto de Força (+5 ATQ Perman.) - 275 Golds", value="amuleto"),
-        app_commands.Choice(name="🛡️ Elixir de Agilidade (+3 AGI Perman.) - 220 Golds", value="elixir")
+        app_commands.Choice(name="🧪 Poção de Cura (+50 HP) - 129 Golds", value="pocao"),
+        app_commands.Choice(name="🥩 Super Ração (+150 XP) - 175 Golds", value="racao"),
+        app_commands.Choice(name="🛡️ Elixir de Agilidade (+3 AGI Perman.) - 291 Golds", value="elixir"),
+        app_commands.Choice(name="⚔️ Amuleto de Força (+5 ATQ Perman.) - 348 Golds", value="amuleto")
     ])
     async def loja(self, interaction: discord.Interaction, item: str):
         user_id = str(interaction.user.id)
@@ -388,8 +388,20 @@ class PetRPG(commands.Cog):
         pet = data[user_id]
         pet.setdefault("inventario", {"pocao": 0})
         
-        precos = {"pocao": 66, "racao": 110, "amuleto": 275, "elixir": 220}
-        nomes_itens = {"pocao": "🧪 Poção de Cura", "racao": "🥩 Super Ração", "amuleto": "⚔️ Amuleto de Força", "elixir": "🛡️ Elixir de Agilidade"}
+        # Tabela de preços com +60 Golds aplicados aos valores anteriores
+        precos = {
+            "pocao": 129,    # Antes: 69
+            "racao": 175,    # Antes: 115
+            "elixir": 291,   # Antes: 231
+            "amuleto": 348   # Antes: 288
+        }
+        
+        nomes_itens = {
+            "pocao": "🧪 Poção de Cura",
+            "racao": "🥩 Super Ração",
+            "elixir": "🛡️ Elixir de Agilidade",
+            "amuleto": "⚔️ Amuleto de Força"
+        }
 
         custo = precos.get(item)
         if not custo:
@@ -397,7 +409,10 @@ class PetRPG(commands.Cog):
 
         if not economy.remove_gold(interaction.user.id, custo):
             saldo_atual = economy.get_gold(interaction.user.id)
-            return await interaction.response.send_message(f"❌ Você não tem Golds suficientes! O item custa **{custo} Golds** e seu saldo é de **{saldo_atual:,} Golds**.", ephemeral=True)
+            return await interaction.response.send_message(
+                f"❌ Você não tem Golds suficientes! O item custa **{custo} Golds** e seu saldo é de **{saldo_atual:,} Golds**.", 
+                ephemeral=True
+            )
 
         msg_extra = ""
 
@@ -420,14 +435,14 @@ class PetRPG(commands.Cog):
                 pet["stats"]["defesa"] += 2
                 msg_extra += f"\n🎊 **LEVEL UP!** Seu Pet alcançou o **Nível {pet['level']}**!"
 
-        elif item == "amuleto":
-            pet["stats"]["atq"] += 5
-            msg_extra = f"⚔️ O Ataque permanente do seu Pet aumentou para **{pet['stats']['atq']}**!"
-
         elif item == "elixir":
             pet["stats"].setdefault("agi", 5)
             pet["stats"]["agi"] += 3
             msg_extra = f"💨 A Agilidade permanente do seu Pet aumentou para **{pet['stats']['agi']}**!"
+
+        elif item == "amuleto":
+            pet["stats"]["atq"] += 5
+            msg_extra = f"⚔️ O Ataque permanente do seu Pet aumentou para **{pet['stats']['atq']}**!"
 
         save_data(data)
         saldo_restante = economy.get_gold(interaction.user.id)
@@ -440,7 +455,7 @@ class PetRPG(commands.Cog):
         embed.set_footer(text=f"Saldo restante na carteira: {saldo_restante:,} Golds")
 
         await interaction.response.send_message(embed=embed)
-
+    
     # 4. COMANDO: /top_pets (RANKING GLOBAL)
     @app_commands.command(name="top_pets", description="Exibe o ranking global dos Pets mais fortes do servidor!")
     async def top_pets(self, interaction: discord.Interaction):
