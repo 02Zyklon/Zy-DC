@@ -456,38 +456,70 @@ class PetRPG(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
     
-    # 4. COMANDO: /top_pets (RANKING GLOBAL)
+   # 4. COMANDO: /top_pets (LENDO DIRECTAMENTE DE PETS.JSON)
     @app_commands.command(name="top_pets", description="Exibe o ranking global dos Pets mais fortes do servidor!")
     async def top_pets(self, interaction: discord.Interaction):
-        data = load_data()
+        await interaction.response.defer()
 
-        if not data:
-            return await interaction.response.send_message("📊 Nenhum Pet foi cadastrado no servidor ainda!", ephemeral=True)
+        try:
+            data = load_data()
 
-        # Ordenar os pets por Nível (decrescente) e depois por XP (decrescente)
-        sorted_pets = sorted(data.items(), key=lambda item: (item[1].get("level", 1), item[1].get("xp", 0)), reverse=True)
+            if not data:
+                return await interaction.followup.send("📊 Nenhum Pet encontrado em `pets.json`!", ephemeral=True)
 
-        medals = ["🥇", "🥈", "🥉"]
-        ranking_txt = []
-
-        for index, (uid, pet) in enumerate(sorted_pets[:10], start=1):
-            emoji = medals[index - 1] if index <= 3 else f"`#{index}`"
-            user = self.bot.get_user(int(uid))
-            dono_nome = user.display_name if user else f"Treinador_{uid[-4:]}"
-            
-            ranking_txt.append(
-                f"{emoji} **{pet['nome']}** *(Lv. {pet['level']})* — Dono: **{dono_nome}**\n"
-                f"└ ⚔️ ATQ: `{pet['stats']['atq']}` | 🛡️ DEF: `{pet['stats']['defesa']}` | ⭐ XP: `{pet['xp']}`"
+            # Ordena pelos pets de maior Level e XP
+            sorted_pets = sorted(
+                data.items(), 
+                key=lambda item: (item[1].get("level", 1), item[1].get("xp", 0)), 
+                reverse=True
             )
 
-        embed = discord.Embed(
-            title="🏆 RANKING GLOBAL DE PETS",
-            description="\n\n".join(ranking_txt),
-            color=discord.Color.gold()
-        )
-        embed.set_footer(text="Treine seu Pet na /masmorra e no /xplorar para subir no ranking!")
+            medals = ["🥇", "🥈", "🥉"]
+            ranking_txt = []
 
-        await interaction.response.send_message(embed=embed)
+            for index, (uid, pet) in enumerate(sorted_pets[:10], start=1):
+                emoji = medals[index - 1] if index <= 3 else f"`#{index}`"
+                
+                # Resgate do dono no Discord
+                user = self.bot.get_user(int(uid))
+                if user:
+                    dono_nome = user.display_name
+                else:
+                    try:
+                        user = await self.bot.fetch_user(int(uid))
+                        dono_nome = user.display_name
+                    except Exception:
+                        dono_nome = f"Treinador_{uid[-4:]}"
+                
+                # Dados lidos do JSON
+                nome = pet.get("nome", "Pet sem nome")
+                raca = pet.get("raça", "Desconhecida")
+                elemento = pet.get("elemento", "Nenhum").capitalize()
+                level = pet.get("level", 1)
+                xp = pet.get("xp", 0)
+                
+                stats = pet.get("stats", {})
+                atq = stats.get("atq", 0)
+                defesa = stats.get("defesa", 0)
+                agi = stats.get("agi", 0)
+
+                ranking_txt.append(
+                    f"{emoji} **{nome}** *(Lv. {level})* — Dono: **{dono_nome}**\n"
+                    f"└ 🐾 Raça: `{raca}` | 🔮 Elemento: `{elemento}`\n"
+                    f"└ ⚔️ ATQ: `{atq:,}` | 🛡️ DEF: `{defesa:,}` | 💨 AGI: `{agi:,}` | ⭐ XP: `{xp:,}`"
+                )
+
+            embed = discord.Embed(
+                title="🏆 RANKING GLOBAL DE PETS",
+                description="\n\n".join(ranking_txt),
+                color=discord.Color.gold()
+            )
+            embed.set_footer(text="Treine seu Pet na /masmorra e no /xplorar para subir no ranking!")
+
+            await interaction.followup.send(embed=embed)
+
+        except Exception as e:
+            await interaction.followup.send(f"❌ Erro ao ler `pets.json`: `{e}`", ephemeral=True)
 
     # 5. COMANDOS DO WORLD BOSS
     @app_commands.command(name="set_boss", description="[ADMIN] Invoca um novo World Boss para o servidor!")
