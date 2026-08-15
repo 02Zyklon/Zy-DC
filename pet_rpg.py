@@ -218,13 +218,14 @@ class PetRPG(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
-    # 4. COMANDO: /masmorra (PVE)
+    # 4. COMANDO: /masmorra (PVE) - COMBATE AVANÇADO
     @app_commands.command(name="masmorra", description="Enfrente monstros em uma masmorra para ganhar XP e Golds!")
     @app_commands.choices(dificuldade=[
         app_commands.Choice(name="🟢 Caverna Tranquila (Fácil)", value="facil"),
         app_commands.Choice(name="🟡 Floresta Fechada (Média)", value="medio"),
         app_commands.Choice(name="🔴 Vulcão Infernal (Difícil)", value="dificil")
     ])
+    @app_commands.checks.cooldown(1, 1800, key=lambda i: i.user.id) # Cooldown de 30 minutos
     async def masmorra(self, interaction: discord.Interaction, dificuldade: app_commands.Choice[str]):
         user_id = str(interaction.user.id)
         data = load_data()
@@ -235,6 +236,13 @@ class PetRPG(commands.Cog):
         pet = data[user_id]
         st = pet["stats"]
 
+        # SISTEMA DE FERIMENTO: Impede o uso se o pet estiver desmaiado
+        if st.get("hp_atual", st["hp_max"]) <= 0:
+            return await interaction.response.send_message(
+                "💀 Seu Pet está gravemente ferido e desmaiado! Compre uma **🧪 Poção de Cura** na `/loja` antes de tentar batalhar novamente.", 
+                ephemeral=True
+            )
+
         monstros = {
             "facil": {"nome": "Slime Solitário", "hp": 50, "atq": 12, "def": 3, "elemento": "agua", "xp_min": 25, "xp_max": 45, "gold_min": 20, "gold_max": 40},
             "medio": {"nome": "Lobo das Sombras", "hp": 100, "atq": 22, "def": 8, "elemento": "trovao", "xp_min": 55, "xp_max": 95, "gold_min": 50, "gold_max": 90},
@@ -242,7 +250,9 @@ class PetRPG(commands.Cog):
         }
 
         mob = monstros[dificuldade.value].copy()
-        pet_hp = st["hp_max"]
+        
+        # O HP agora puxa a vida atual, não a máxima. Não há cura grátis.
+        pet_hp = st.get("hp_atual", st["hp_max"]) 
         mob_hp = mob["hp"]
         
         vantagens = {"fogo": "trovao", "trovao": "agua", "agua": "fogo"}
@@ -253,25 +263,47 @@ class PetRPG(commands.Cog):
         rodada = 1
 
         while pet_hp > 0 and mob_hp > 0 and rodada <= 8:
+            # --- TURNO DO PET (Ataque + Crítico) ---
+            chance_crit = min(st["agi"], 50) # Cap de 50% de chance
+            is_crit = random.randint(1, 100) <= chance_crit
+            
             dano_pet = max(3, int((st["atq"] * mult_pet) - (mob["def"] / 2)) + random.randint(-2, 3))
+            
+            crit_msg = ""
+            if is_crit:
+                dano_pet = int(dano_pet * 1.5)
+                crit_msg = "🎯 **CRÍTICO!** "
+
             mob_hp -= dano_pet
             
             if mob_hp <= 0:
                 mob_hp = 0
-                logs.append(f"⚔️ **R{rodada}:** Seu Pet causou `{dano_pet}` de dano e eliminou o **{mob['nome']}**!")
+                logs.append(f"⚔️ **R{rodada}:** {crit_msg}Seu Pet causou `{dano_pet}` de dano e eliminou o **{mob['nome']}**!")
                 break
 
-            dano_mob = max(3, int((mob["atq"] * mult_mob) - (st["defesa"] / 2)) + random.randint(-2, 3))
-            pet_hp -= dano_mob
+            # --- TURNO DO MONSTRO (Ataque + Esquiva do Pet) ---
+            chance_esquiva = min(st["agi"], 40) # Cap de 40% de chance
+            is_esquiva = random.randint(1, 100) <= chance_esquiva
             
-            if pet_hp <= 0:
-                pet_hp = 0
-                logs.append(f"💥 **R{rodada}:** **{mob['nome']}** te causou `{dano_mob}` de dano e te nocauteou!")
-                break
+            if is_esquiva:
+                logs.append(f"💨 **R{rodada}:** Seu Pet usou sua agilidade e **ESQUIVOU** do ataque!")
+                dano_mob = 0
+            else:
+                dano_mob = max(3, int((mob["atq"] * mult_mob) - (st["defesa"] / 2)) + random.randint(-2, 3))
+                pet_hp -= dano_mob
+                
+                if pet_hp <= 0:
+                    pet_hp = 0
+                    logs.append(f"💥 **R{rodada}:** **{mob['nome']}** te causou `{dano_mob}` de dano e te nocauteou!")
+                    break
 
-            logs.append(f"⚔️ **R{rodada}:** Você deu `{dano_pet}` dano | **{mob['nome']}** deu `{dano_mob}` dano.")
+            if not is_esquiva:
+                logs.append(f"⚔️ **R{rodada}:** {crit_msg}Pet deu `{dano_pet}` dano | **Mob** deu `{dano_mob}` dano.")
+            
             rodada += 1
 
+        # Salva o HP pós-batalha para evitar farm sem cura
+        pet["stats"]["hp_atual"] = pet_hp
         vitoria = mob_hp <= 0
         pet.setdefault("historico", {"vitorias": 0, "derrotas": 0})
 
@@ -282,7 +314,6 @@ class PetRPG(commands.Cog):
             pet["xp"] += xp_ganho
             pet["historico"]["vitorias"] += 1
 
-            # Adiciona Golds no sistema global de economia
             novo_saldo = economy.add_gold(interaction.user.id, golds_ganhos)
 
             xp_necessario = pet["level"] * 100
@@ -305,21 +336,33 @@ class PetRPG(commands.Cog):
                 color=discord.Color.green()
             )
             embed.add_field(name="🎁 Recompensas", value=f"**+{xp_ganho} XP** | 💰 **+{golds_ganhos} Golds**\n*(Saldo total: {novo_saldo:,} Golds)*", inline=False)
+            embed.set_footer(text=f"HP Restante do seu Pet: {pet_hp}/{st['hp_max']}")
+            
             if subiu:
-                embed.add_field(name="🎊 LEVEL UP!", value=f"Seu Pet subiu para o **Nível {pet['level']}**!", inline=False)
+                embed.add_field(name="🎊 LEVEL UP!", value=f"Seu Pet subiu para o **Nível {pet['level']}** e curou o HP!", inline=False)
         else:
             pet["historico"]["derrotas"] += 1
+            
+            # PUNIÇÃO HARDCORE
+            punicao_txt = ""
+            if dificuldade.value == "dificil":
+                saldo_atual = economy.get_gold(interaction.user.id)
+                punicao_gold = int(saldo_atual * 0.05) # Perde 5% do ouro total
+                if punicao_gold > 0:
+                    economy.remove_gold(interaction.user.id, punicao_gold)
+                    punicao_txt = f"\n\n💀 **MORTE BRUTAL:** Você desmaiou no Vulcão Infernal e perdeu **{punicao_gold} Golds** do seu banco!"
+
             save_data(data)
 
             embed = discord.Embed(
                 title=f"💀 DERROTA NA MASMORRA...",
-                description=f"**Desafio:** {dificuldade.name}\n\n" + "\n".join(logs),
-                color=discord.Color.red()
+                description=f"**Desafio:** {dificuldade.name}\n\n" + "\n".join(logs) + punicao_txt,
+                color=discord.Color.dark_red()
             )
-            embed.set_footer(text="Use /foguinho para subir de nível e comprar itens na /loja!")
+            embed.set_footer(text="Acesse a /loja e compre uma poção para reanimar seu Pet!")
 
         await interaction.response.send_message(embed=embed)
-
+    
     # 5. COMANDO: /duelar (PVP INTERATIVO)
     @app_commands.command(name="duelar", description="Desafie outro jogador para um duelo de Pets valendo Golds!")
     async def duelar(self, interaction: discord.Interaction, oponente: discord.Member):
