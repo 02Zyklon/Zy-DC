@@ -1057,6 +1057,24 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
         else:
             await interaction.followup.send(msg, ephemeral=True)
 
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.CommandOnCooldown):
+        minutos = round(error.retry_after / 60)
+        msg = f"⏳ Calma aí! Seus personagens estão exaustos. Você poderá batalhar novamente em **{minutos} minutos**."
+        
+        if not interaction.response.is_done():
+            await interaction.response.send_message(msg, ephemeral=True)
+        else:
+            await interaction.followup.send(msg, ephemeral=True)
+            
+    elif isinstance(error, app_commands.MissingPermissions):
+        msg = "❌ Você não tem permissão para usar este comando."
+        if not interaction.response.is_done():
+            await interaction.response.send_message(msg, ephemeral=True)
+        else:
+            await interaction.followup.send(msg, ephemeral=True)
+
 # ==========================================
 # 🚀 INICIALIZAÇÃO
 # ==========================================
