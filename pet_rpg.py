@@ -89,6 +89,61 @@ CENARIOS_GUILDA = [
     {"bioma": "Núcleo de Yggdrasil", "mob": "Avatar Corrompido", "hp": 300, "atq": 48, "def": 25, "xp": 300, "gold": 280}
 ]
 
+# ==========================================
+# CLASSE AUXILIAR DE ECONOMIA (Fallback Seguro)
+# ==========================================
+class SafeEconomy:
+    @staticmethod
+    def add_gold(user_id, amount):
+        # Se houver outro sistema de economia global integrado no seu bot principal, 
+        # substitua a lógica abaixo ou importe o módulo real.
+        eco_file = "economy.json"
+        data = {}
+        if os.path.exists(eco_file):
+            try:
+                with open(eco_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except:
+                pass
+        uid = str(user_id)
+        data[uid] = data.get(uid, 0) + amount
+        with open(eco_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+        return data[uid]
+
+    @staticmethod
+    def remove_gold(user_id, amount):
+        eco_file = "economy.json"
+        data = {}
+        if os.path.exists(eco_file):
+            try:
+                with open(eco_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except:
+                pass
+        uid = str(user_id)
+        current = data.get(uid, 0)
+        if current < amount:
+            return False
+        data[uid] = current - amount
+        with open(eco_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+        return True
+
+    @staticmethod
+    def get_gold(user_id):
+        eco_file = "economy.json"
+        if os.path.exists(eco_file):
+            try:
+                with open(eco_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    return data.get(str(user_id), 0)
+            except:
+                pass
+        return 0
+
+economy = SafeEconomy()
+
 
 # ==========================================
 # INTERFACE DE NAVEGAÇÃO DA EXPLORAÇÃO
@@ -256,7 +311,7 @@ class PetRPG(commands.Cog):
 
         await interaction.followup.send(embed=embed)
 
-    # 1. COMANDO: /masmorra (Blindado contra load infinito)
+    # 1. COMANDO: /masmorra
     @app_commands.command(name="masmorra", description="Enfrente monstros em uma masmorra para ganhar XP e Golds!")
     @app_commands.choices(dificuldade=[
         app_commands.Choice(name="🟢 Caverna Tranquila (Fácil)", value="facil"),
@@ -268,7 +323,6 @@ class PetRPG(commands.Cog):
         user_id = str(interaction.user.id)
         data = load_data()
 
-        # Validação direta sem Defer previne travamentos/load infinito
         if user_id not in data:
             return await interaction.response.send_message("❌ Você precisa ter um Pet! Use `/pet_adotar` primeiro.", ephemeral=True)
 
@@ -278,7 +332,6 @@ class PetRPG(commands.Cog):
         if st.get("hp_atual", st.get("hp_max", 100)) <= 0:
             return await interaction.response.send_message("💀 Seu Pet está desmaiado! Compre uma **🧪 Poção de Cura** na `/loja` antes de tentar batalhar.", ephemeral=True)
 
-        # Só deferimos após passar pelas validações com sucesso
         await interaction.response.defer()
 
         monstros = {
