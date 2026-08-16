@@ -422,8 +422,7 @@ class PetRPG(commands.Cog):
                 ),
                 color=info["cor"]
             )
-
-        # 🌟 Checagem automática para o cargo de Aventureiro ao atingir o Nível 20
+# 🌟 Checagem automática para o cargo de Aventureiro ao atingir o Nível 20
         if pet["nivel"] >= 20 and not pet.get("convite_enviado", False):
             pet["convite_enviado"] = True
             save_rpg_db(db)
@@ -431,17 +430,21 @@ class PetRPG(commands.Cog):
             convite_embed = discord.Embed(
                 title="🌟 Seu Pet Alcançou o Nível 20!",
                 description=(
-                    "O seu companheiro ficou forte o suficiente para se tornar um **Aventureiro Oficial** de Yggdrasil!\n\n"
+                    f"O companheiro de {interaction.user.mention} ficou forte o suficiente para se tornar um **Aventureiro Oficial** de Yggdrasil!\n\n"
                     "Deseja aceitar o título de Aventureiro para desbloquear **canais exclusivos** e provar seu valor?"
                 ),
                 color=discord.Color.blurple()
             )
             view = AventureiroConfirmView(CARGO_AVENTUREIRO_ID, CANAL_ESPECIFICO_ID)
             
-            try:
-                await interaction.user.send(embed=convite_embed, view=view)
-            except discord.Forbidden:
-                await interaction.followup.send(f"{interaction.user.mention}", embed=convite_embed, view=view, ephemeral=True)
+            # ID exato do canal onde o aviso deve ser enviado
+            ID_CANAL_AVISO = 1537883858467430552
+            canal_aviso = interaction.guild.get_channel(ID_CANAL_AVISO)
+
+            if canal_aviso:
+                await canal_aviso.send(content=interaction.user.mention, embed=convite_embed, view=view)
+            else:
+                await interaction.followup.send(f"{interaction.user.mention}", embed=convite_embed, view=view, ephemeral=False)
 
         embed.set_footer(text=f"Explorador: {interaction.user.display_name} • 🐾 Pet: {pet['nome']} (Nv. {pet['nivel']})")
         await interaction.followup.send(embed=embed)
