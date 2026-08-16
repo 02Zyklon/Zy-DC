@@ -279,9 +279,10 @@ class PetRPG(commands.Cog):
     def _load_pets(self):
         return load_data()
 
-    @app_commands.command(name="foguinho", description="🔥 Invoca o poder do pet Foguinho/Faisquinha.")
+    # 1. COMANDO: /foguinho (Protegido com bloqueio de 1 uso diário)
+    @app_commands.command(name="foguinho", description="🔥 Invoca o poder e status diário do seu pet.")
     async def foguinho(self, interaction: discord.Interaction):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         user_id = str(interaction.user.id)
         pets_data = self._load_pets()
@@ -290,6 +291,14 @@ class PetRPG(commands.Cog):
             return await interaction.followup.send("⚠️ Você ainda não possui um pet registrado no sistema!")
 
         pet = pets_data[user_id]
+
+        # Trava de uso diário para o foguinho/recompensa
+        data_atual = datetime.now().strftime("%Y-%m-%d")
+        if pet.get("ultima_foguinho_data") == data_atual:
+            return await interaction.followup.send("⏳ Você já consultou o `/foguinho` hoje! Volte amanhã para renovar as energias.")
+
+        pet["ultima_foguinho_data"] = data_atual
+        save_data(pets_data)
 
         embed = discord.Embed(
             title=f"🔥 Painel do Pet: {pet.get('nome', 'Foguinho')}",
@@ -310,7 +319,36 @@ class PetRPG(commands.Cog):
 
         await interaction.followup.send(embed=embed)
 
-    # 1. COMANDO: /masmorra
+    # 2. COMANDO: /daily (Recompensa diária protegida contra fraude)
+    @app_commands.command(name="daily", description="🎁 Coleta sua recompensa diária em Golds para o seu pet!")
+    async def daily(self, interaction: discord.Interaction):
+        user_id = str(interaction.user.id)
+        pets_data = load_data()
+
+        if user_id not in pets_data:
+            return await interaction.response.send_message("❌ Você precisa adotar um Pet com `/pet_adotar` primeiro para resgatar o daily!", ephemeral=True)
+
+        pet = pets_data[user_id]
+        data_atual = datetime.now().strftime("%Y-%m-%d")
+
+        if pet.get("ultimo_daily_data") == data_atual:
+            return await interaction.response.send_message("⏳ Você já resgatou sua recompensa `/daily` hoje! Volte amanhã.", ephemeral=True)
+
+        pet["ultimo_daily_data"] = data_atual
+        save_data(pets_data)
+
+        golds_ganhos = random.randint(200, 500)
+        novo_saldo = economy.add_gold(interaction.user.id, golds_ganhos)
+
+        embed = discord.Embed(
+            title="🎁 RECOMPENSA DIÁRIA COLETADA!",
+            description=f"Você resgatou com sucesso o seu **`/daily`**!\n\n💰 **Prêmio:** `+{golds_ganhos} Golds`\n💼 **Novo Saldo:** `{novo_saldo:,} Golds`",
+            color=discord.Color.gold()
+        )
+        embed.set_footer(text="Volte amanhã para resgatar novamente!")
+        await interaction.response.send_message(embed=embed)
+
+    # 3. COMANDO: /masmorra
     @app_commands.command(name="masmorra", description="Enfrente monstros em uma masmorra para ganhar XP e Golds!")
     @app_commands.choices(dificuldade=[
         app_commands.Choice(name="🟢 Caverna Tranquila (Fácil)", value="facil"),
@@ -440,7 +478,7 @@ class PetRPG(commands.Cog):
 
         await interaction.followup.send(embed=embed)
 
-    # 2. COMANDO: /xplorar (Com Reset Diário Automático por Data)
+    # 4. COMANDO: /xplorar (Com Trava de Limite Diário Corrigida)
     @app_commands.command(name="xplorar", description="[GUILDA] Explore ecossistemas para batalhar e subir de nível rápido!")
     async def xplorar(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
@@ -458,9 +496,11 @@ class PetRPG(commands.Cog):
                 ephemeral=True
             )
 
-        # Lógica de Reset Diário baseada na data atual (YYYY-MM-DD)
         data_atual = datetime.now().strftime("%Y-%m-%d")
         ultima_data = pet.get("ultima_exploracao_data", "")
+
+        if ultima_data == data_atual and pet.get("exploracao_hoje", 0) >= 10:
+            return await interaction.response.send_message("⏳ Você já completou suas **10 explorações diárias**. Volte amanhã!", ephemeral=True)
 
         if ultima_data != data_atual:
             pet["ultima_exploracao_data"] = data_atual
@@ -468,8 +508,6 @@ class PetRPG(commands.Cog):
             save_data(pets)
 
         hoje = pet.get("exploracao_hoje", 0)
-        if hoje >= 10:
-            return await interaction.response.send_message("⏳ Você já completou suas **10 explorações diárias**. Volte amanhã!", ephemeral=True)
 
         cenario_inicial = random.choice(CENARIOS_GUILDA)
         view = ExplorarView(user_id, pet, cenario_inicial, hoje)
@@ -488,7 +526,7 @@ class PetRPG(commands.Cog):
 
         await interaction.response.send_message(embed=embed, view=view)
 
-    # 3. COMANDO: /loja
+    # 5. COMANDO: /loja
     @app_commands.command(name="loja", description="Compre itens com seus Golds para melhorar seu Pet!")
     @app_commands.choices(item=[
         app_commands.Choice(name="🧪 Poção de Cura (+50 HP) - 129 Golds", value="pocao"),
@@ -573,7 +611,7 @@ class PetRPG(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
     
-    # 4. COMANDO: /top_pets
+    # 6. COMANDO: /top_pets
     @app_commands.command(name="top_pets", description="Exibe o ranking global dos Pets mais fortes do servidor!")
     async def top_pets(self, interaction: discord.Interaction):
         await interaction.response.defer()
@@ -635,7 +673,7 @@ class PetRPG(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"❌ Erro ao ler `pets.json`: `{e}`", ephemeral=True)
 
-    # 5. COMANDOS DO WORLD BOSS
+    # 7. COMANDOS DO WORLD BOSS
     @app_commands.command(name="set_boss", description="[ADMIN] Invoca um novo World Boss para o servidor!")
     @app_commands.checks.has_permissions(administrator=True)
     async def set_boss(self, interaction: discord.Interaction, nome: str, hp_total: int, premio_golds: int):
