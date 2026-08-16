@@ -36,8 +36,18 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # ID do seu servidor no Discord (Guild)
 GUILD_ID = 1434359569718706320
 
-# Arquivo de armazenamento de configurações de registro
+# Arquivos de armazenamento JSON
 DB_REGISTRO = "config_registro.json"
+DB_AJUDA = "ajuda_config.json"
+
+CATEGORIAS_VALIDAS = [
+    "🐾 Sistema de Pets & RPG",
+    "💰 Economia & Carteira",
+    "🛠️ Utilitários & IAs",
+    "🛒 Vendas & Tickets",
+    "🎫 Atendimento & Registro",
+    "🛡️ Moderação & Gestão"
+]
 
 def load_json(file_path, default):
     if not os.path.exists(file_path):
@@ -444,17 +454,13 @@ async def painelticket(interaction: discord.Interaction):
 @bot.tree.command(name="setup_servidor", description="✨ Cria a estrutura de canais com visual Serif/Bold impecável.")
 @app_commands.checks.has_permissions(administrator=True)
 async def setup_servidor(interaction: discord.Interaction):
-    """Cria a estrutura de canais com todos os nomes estilizados corretamente."""
-    
     await interaction.response.defer(ephemeral=True)
     guild = interaction.guild
 
     try:
-        # 🚨 1. FILTRAÇÃO
         cat_filtracao = await guild.create_category("🚨 𝑭𝑰𝑳𝑻𝑹𝑨𝑪̧𝑨̃𝑶 ›")
         await guild.create_text_channel("🚨・filtração", category=cat_filtracao)
 
-        # 📌 2. INGRESSO / INSTITUCIONAL
         cat_ing = await guild.create_category("📌 𝑾𝑬𝑳𝑪𝑶𝑴𝑬 ›")
         c_regras = await guild.create_text_channel("📜・diretrizes", category=cat_ing)
         await guild.create_text_channel("📢・anuncios", category=cat_ing)
@@ -471,7 +477,6 @@ async def setup_servidor(interaction: discord.Interaction):
         )
         await c_regras.send(embed=embed_regras)
 
-        # 🛒 3. ZYKLON VENDAS
         cat_loja = await guild.create_category("🛒 𝒁𝒀𝑲𝑳𝑶𝑵 𝑽𝑬𝑵𝑫𝑨𝑺 ›")
         await guild.create_text_channel("💎・dimas-via-token", category=cat_loja)
         await guild.create_text_channel("🎁・presentes-e-passes", category=cat_loja)
@@ -481,18 +486,15 @@ async def setup_servidor(interaction: discord.Interaction):
         await guild.create_text_channel("🛒・referencias", category=cat_loja)
         await guild.create_text_channel("📜・termos-e-uso", category=cat_loja)
 
-        # 🛠️ 4. ATENDIMENTO & TICKETS
         cat_ticket = await guild.create_category("🛠️ 𝑨𝑻𝑬𝑵𝑫𝑰𝑑𝑬𝑵𝑻𝑶 ›")
         await guild.create_text_channel("🎫・abrir-ticket", category=cat_ticket)
 
-        # 💬 5. COMUNIDADE
         cat_dev = await guild.create_category("⚙ 𝑵𝑬𝑑𝑼𝑺 ┃ 𝑪𝑶𝑴𝑼𝑵𝑰𝑫𝑨𝑫𝑬 ›")
         await guild.create_text_channel("💬・chat-geral", category=cat_dev)
         await guild.create_text_channel("🤖・comandos-bot", category=cat_dev)
         await guild.create_text_channel("💻・dev-lounge", category=cat_dev)
         await guild.create_text_channel("🤝・parcerias", category=cat_dev)
 
-        # 🏆 6. GUILDA
         cat_ff = await guild.create_category("🏆 𝑶𝑺 𝑨𝑴𝑶𝑺𝑻𝑑𝑨𝑫𝑰𝑵𝑯𝑶𝑺 ›")
         await guild.create_text_channel("💬・chat-central", category=cat_ff)
         await guild.create_text_channel("📌・avisos-linha-de-frente", category=cat_ff)
@@ -501,19 +503,16 @@ async def setup_servidor(interaction: discord.Interaction):
         for i in range(1, 11):
             await guild.create_voice_channel(f"🎙・{i}ª-Line", user_limit=5, category=cat_ff)
 
-        # 🔊 7. CALLS PÚBLICAS
         cat_calls = await guild.create_category("🔊 𝑪𝑨𝑳𝑳𝑺 ┃ 𝑷𝑼𝑩𝑳𝑰𝑪𝑨𝑺 ›")
         await guild.create_voice_channel("🎧・Main-Lobby", category=cat_calls)
         await guild.create_voice_channel("🎯・Squad-01", user_limit=4, category=cat_calls)
         await guild.create_voice_channel("🎯・Squad-02", user_limit=4, category=cat_calls)
         await guild.create_voice_channel("☕・Resenha-01", category=cat_calls)
 
-        # 🔒 8. ADMIN PANEL
         cat_admin = await guild.create_category("🔒 𝑨𝑫𝑑𝑰𝑵 𝑷𝑨𝑵𝑬𝑳 ›")
         await guild.create_text_channel("📡・bot-logs", category=cat_admin)
         await guild.create_text_channel("🛡・staff-only", category=cat_admin)
 
-        # ⚔️ 9. RPG YGGDRASIL
         cat_rpg = await guild.create_category("⚔️ 𝑹𝑷𝑮 𝒀𝑮𝑮𝑫𝑑𝑨𝑺𝑰𝑳 ›")
         c_como_jogar = await guild.create_text_channel("📜・como-jogar", category=cat_rpg)
         await guild.create_text_channel("🔥・foguinho-e-cassino", category=cat_rpg)
@@ -550,7 +549,6 @@ async def setup_servidor(interaction: discord.Interaction):
 @bot.tree.command(name="setup_rpg", description="⚔️ Cria apenas a categoria e os canais do RPG Yggdrasil.")
 @app_commands.checks.has_permissions(administrator=True)
 async def setup_rpg(interaction: discord.Interaction):
-    """Cria isoladamente a estrutura do RPG Yggdrasil."""
     await interaction.response.defer(ephemeral=True)
     guild = interaction.guild
 
@@ -636,7 +634,42 @@ async def serverinfo(interaction: discord.Interaction):
 
 
 # ==========================================
-# 📚 MENU DE AJUDA INTERATIVO ATUALIZADO
+# ➕ COMANDO ADMIN: ADICIONAR COMANDO AO /AJUDA
+# ==========================================
+@bot.tree.command(name="adc_comando", description="[ADMIN] Adiciona um novo comando a uma categoria no menu /ajuda.")
+@app_commands.describe(
+    categoria="A categoria onde o comando vai aparecer",
+    nome_comando="O nome do comando (ex: /ban ou /pet)",
+    descricao="Breve explicação do que o comando faz"
+)
+@app_commands.choices(categoria=[
+    app_commands.Choice(name="🐾 Sistema de Pets & RPG", value="🐾 Sistema de Pets & RPG"),
+    app_commands.Choice(name="💰 Economia & Carteira", value="💰 Economia & Carteira"),
+    app_commands.Choice(name="🛠️ Utilitários & IAs", value="🛠️ Utilitários & IAs"),
+    app_commands.Choice(name="🛒 Vendas & Tickets", value="🛒 Vendas & Tickets"),
+    app_commands.Choice(name="🎫 Atendimento & Registro", value="🎫 Atendimento & Registro"),
+    app_commands.Choice(name="🛡️ Moderação & Gestão", value="🛡️ Moderação & Gestão"),
+])
+@app_commands.checks.has_permissions(administrator=True)
+async def adc_comando(interaction: discord.Interaction, categoria: str, nome_comando: str, descricao: str):
+    await interaction.response.defer(ephemeral=True)
+    
+    dados_ajuda = load_json(DB_AJUDA, {cat: {} for cat in CATEGORIAS_VALIDAS})
+    
+    if categoria not in dados_ajuda:
+        dados_ajuda[categoria] = {}
+        
+    dados_ajuda[categoria][nome_comando] = descricao
+    save_json(DB_AJUDA, dados_ajuda)
+    
+    await interaction.followup.send(
+        f"✅ Comando **{nome_comando}** adicionado com sucesso à categoria **{categoria}**!", 
+        ephemeral=True
+    )
+
+
+# ==========================================
+# 📚 MENU DE AJUDA INTERATIVO DINÂMICO
 # ==========================================
 class AjudaView(discord.ui.View):
     def __init__(self):
@@ -648,7 +681,7 @@ class AjudaView(discord.ui.View):
         max_values=1,
         options=[
             discord.SelectOption(label="🐾 Sistema de Pets & RPG", description="Comandos de adoção, perfil, loja, inventário e exploração.", emoji="🐉"),
-            discord.SelectOption(label="💰 Economia & Carteira", description="Comandos de saldo, pix, pagamentos e rank de golds.", emoji="💳"),
+            discord.SelectOption(label="💰 Economia & Carteira", description="Comandos de saldo, pagamentos e rank de golds.", emoji="💳"),
             discord.SelectOption(label="🛠️ Utilitários & IAs", description="Comandos gerais, perfil e Inteligências Artificiais", emoji="🛠️"),
             discord.SelectOption(label="🛒 Vendas & Tickets", description="Sistemas de suporte e anúncios de produtos", emoji="🛒"),
             discord.SelectOption(label="🎫 Atendimento & Registro", description="Configurações de suporte e filtração por senha", emoji="🎫"),
@@ -657,92 +690,33 @@ class AjudaView(discord.ui.View):
     )
     async def selecionar_categoria(self, interaction: discord.Interaction, select: discord.ui.Select):
         opcao = select.values[0]
+        
+        dados_ajuda = load_json(DB_AJUDA, {})
+        comandos_categoria = dados_ajuda.get(opcao, {})
 
-        if opcao == "🐾 Sistema de Pets & RPG":
-            embed = discord.Embed(
-                title="🐾 Central de Ajuda — RPG & Pets",
-                description="Gerencie seu companheiro de Yggdrasil com os comandos abaixo:",
-                color=discord.Color.green()
-            )
-            embed.add_field(name="/pet_adotar", value="Adote seu pet inicial (Fogo, Água ou Trovão).", inline=False)
-            embed.add_field(name="/pet_perfil", value="Exibe os status, vida, XP e nível atual do seu pet.", inline=False)
-            embed.add_field(name="/inventario", value="Acesse sua mochila para ver poções, rações e itens guardados.", inline=False)
-            embed.add_field(name="/loja", value="Compre itens especiais usando seus Golds.", inline=False)
-            embed.add_field(name="/masmorra", value="Enfrente monstros nas profundezas por recompensas.", inline=False)
-            embed.add_field(name="/explorar", value="Explore biomas perigosos (Requer Nível 20+).", inline=False)
+        cores = {
+            "🐾 Sistema de Pets & RPG": discord.Color.green(),
+            "💰 Economia & Carteira": discord.Color.gold(),
+            "🛠️ Utilitários & IAs": discord.Color.blue(),
+            "🛒 Vendas & Tickets": discord.Color.green(),
+            "🎫 Atendimento & Registro": discord.Color.purple(),
+            "🛡️ Moderação & Gestão": discord.Color.red()
+        }
 
-        elif opcao == "💰 Economia & Carteira":
-            embed = discord.Embed(
-                title="💰 Central de Ajuda — Economia",
-                description="Gerencie suas finanças e Golds no servidor:",
-                color=discord.Color.gold()
-            )
-            embed.add_field(name="/carteira", value="Consulte o seu saldo atual de Golds.", inline=False)
-            embed.add_field(name="/pay", value="Transfira Golds para outros usuários.", inline=False)
-            embed.add_field(name="/rank", value="Veja o ranking dos membros mais ricos do servidor.", inline=False)
+        embed = discord.Embed(
+            title=f"📂 Central de Ajuda — {opcao}",
+            description="Lista de comandos cadastrados nesta categoria:\n",
+            color=cores.get(opcao, discord.Color.dark_theme())
+        )
 
-        elif opcao == "🛠️ Utilitários & IAs":
-            embed = discord.Embed(
-                title="🛠️ Utilitários & Inteligências Artificiais",
-                description=(
-                    "• `/gemini` — Pergunta algo para a IA do Google (Gemini 2.5 Flash)\n"
-                    "• `/chatgpt` — Pergunta algo para o ChatGPT (GPT-4o-mini)\n"
-                    "• `/ping` — Exibe a latência de conexão do bot\n"
-                    "• `/userinfo` — Mostra datas, ID e cargos de um membro\n"
-                    "• `/serverinfo` — Mostra informações completas do servidor\n"
-                    "• `/avatar` — Baixa e exibe a foto de perfil de um membro\n"
-                    "• `/embed` — Cria uma caixa de mensagem formatada\n"
-                    "• `/enquete` — Inicia uma votação por reações (👍 / 👎)\n"
-                    "• `/lembrete` — Programa um aviso com contagem regressiva\n"
-                    "• `/moeda` — Sorteia entre Cara ou Coroa"
-                ),
-                color=discord.Color.blue()
-            )
-
-        elif opcao == "🛒 Vendas & Tickets":
-            embed = discord.Embed(
-                title="🛒 Loja & Vendas",
-                description=(
-                    "• `/fixar_produto` — Fixa o anúncio de um produto com botão de compra\n"
-                    "• `/painelticket` — Envia o painel fixo de suporte e atendimento"
-                ),
-                color=discord.Color.green()
-            )
-
-        elif opcao == "🎫 Atendimento & Registro":
-            embed = discord.Embed(
-                title="🎫 Atendimento & Registro por Senha",
-                description=(
-                    "• `/set_chat_filtracao` — Configura o canal onde os membros digitam a senha\n"
-                    "• `/set_passe_cargo` — Associa uma palavra-passe a um cargo automático"
-                ),
-                color=discord.Color.purple()
-            )
-
-        elif opcao == "🛡️ Moderação & Gestão":
-            embed = discord.Embed(
-                title="🛡️ Moderação & Gestão do Servidor",
-                description=(
-                    "• `/limpar` — Apaga mensagens em massa no canal\n"
-                    "• `/limparuser` — Apaga mensagens de um usuário específico\n"
-                    "• `/kick` — Expulsa um membro do servidor\n"
-                    "• `/ban` — Bane um membro do servidor\n"
-                    "• `/mute` — Silencia um membro temporariamente por minutos\n"
-                    "• `/unmute` — Remove o silêncio de um membro\n"
-                    "• `/warn` — Aplica uma advertência privada no PV do usuário\n"
-                    "• `/addcargo` — Adiciona um cargo a um membro\n"
-                    "• `/removecargo` — Remove um cargo de um membro\n"
-                    "• `/nick` — Altera o apelido de um membro no servidor\n"
-                    "• `/lock` — Tranca o canal atual para os membros\n"
-                    "• `/unlock` — Destranca o canal atual\n"
-                    "• `/anuncio` — Envia uma mensagem oficial formatada\n"
-                    "• `/sorteio` — Sorteia um membro aleatório do servidor"
-                ),
-                color=discord.Color.red()
-            )
+        if not comandos_categoria:
+            embed.add_field(name="Vazio", value="Nenhum comando cadastrado via `/adc_comando` nesta categoria ainda.", inline=False)
+        else:
+            for cmd, desc in comandos_categoria.items():
+                embed.add_field(name=cmd, value=desc, inline=False)
 
         embed.set_footer(text="Zy-Bot • Selecione qualquer categoria no menu acima para navegar.")
-        await interaction.response.edit_message(embed=embed, view=self.view)
+        await interaction.response.edit_message(embed=embed, view=self)
 
 
 @bot.tree.command(name="ajuda", description="Central de ajuda interativa do bot")
@@ -812,7 +786,6 @@ async def moeda(interaction: discord.Interaction):
 # ==========================================
 @bot.tree.command(name="gemini", description="Pergunte algo para a IA do Google (Gemini).")
 async def gemini_cmd(interaction: discord.Interaction, pergunta: str):
-    """Responde dúvidas usando o modelo Gemini 2.5 Flash."""
     await interaction.response.defer()
 
     if not gemini_client:
@@ -843,7 +816,6 @@ async def gemini_cmd(interaction: discord.Interaction, pergunta: str):
 
 @bot.tree.command(name="chatgpt", description="Pergunte algo para o ChatGPT (OpenAI).")
 async def chatgpt_cmd(interaction: discord.Interaction, pergunta: str):
-    """Responde dúvidas usando o ChatGPT (GPT-4o-mini)."""
     await interaction.response.defer()
 
     if not openai_client:
@@ -891,7 +863,6 @@ async def criar_canal(
     categoria: discord.CategoryChannel = None,
     topico: str = None
 ):
-    """Cria um canal de texto ou voz formatado."""
     await interaction.response.defer(ephemeral=True)
 
     try:
@@ -929,7 +900,6 @@ async def renomear_canal(
     novo_nome_decorado: str, 
     canal: discord.abc.GuildChannel = None
 ):
-    """Renomeia qualquer canal existente."""
     await interaction.response.defer(ephemeral=True)
 
     target_channel = canal or interaction.channel
@@ -1075,7 +1045,7 @@ async def sorteio(interaction: discord.Interaction, premio: str):
 
 
 # ==========================================
-# ⚙️ TRATAMENTO UNIFICADO DE ERROS (CORRIGIDO)
+# ⚙️ TRATAMENTO UNIFICADO DE ERROS
 # ==========================================
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
