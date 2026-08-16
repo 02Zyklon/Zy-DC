@@ -1099,11 +1099,3 @@ async def main():
 
 if __name__ == "__main__":
     
-    asyncio.run(main())
-        # Isso ativa o servidor web para a host (como a Discloud) não desligar o bot
-keep_alive()
-
-# Prepara a conexão do bot e o liga no Discord
-if __name__ == "__main__":
-    # Substitua "TOKEN" pela sua variável real do token (ex: os.getenv("TOKEN"))
-    bot.run(TOKEN)
