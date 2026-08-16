@@ -268,19 +268,20 @@ class PetRPG(commands.Cog):
     ])
     @app_commands.checks.cooldown(1, 1800, key=lambda i: i.user.id)
     async def masmorra(self, interaction: discord.Interaction, dificuldade: str):
-        await interaction.response.defer()
-
         user_id = str(interaction.user.id)
         data = load_data()
 
         if user_id not in data:
-            return await interaction.followup.send("❌ Você precisa ter um Pet! Use `/pet_adotar` primeiro.", ephemeral=True)
+            return await interaction.response.send_message("❌ Você precisa ter um Pet! Use `/pet_adotar` primeiro.", ephemeral=True)
 
         pet = data[user_id]
         st = pet["stats"]
 
         if st.get("hp_atual", st["hp_max"]) <= 0:
-            return await interaction.followup.send("💀 Seu Pet está desmaiado! Compre uma **🧪 Poção de Cura** na `/loja` antes de tentar batalhar.", ephemeral=True)
+            return await interaction.response.send_message("💀 Seu Pet está desmaiado! Compre uma **🧪 Poção de Cura** na `/loja` antes de tentar batalhar.", ephemeral=True)
+
+        # Só usa o defer aqui em cima se passou das validações, evitando o load infinito
+        await interaction.response.defer()
 
         monstros = {
             "facil": {"nome": "Slime Solitário", "hp": 50, "atq": 12, "def": 3, "elemento": "agua", "xp_min": 25, "xp_max": 45, "gold_min": 20, "gold_max": 40},
@@ -390,43 +391,127 @@ class PetRPG(commands.Cog):
         await interaction.followup.send(embed=embed)
 
     # 2. COMANDO: /xplorar
-    @app_commands.command(name="xplorar", description="[GUILDA] Explore ecossistemas para batalhar e subir de nível rápido!")
-    async def xplorar(self, interaction: discord.Interaction):
-        user_id = str(interaction.user.id)
-        pets = load_data()
+class ExplorarView(discord.ui.View):
+    def __init__(self, user_id, pet_data, cenario, progresso_diario):
+        super().__init__(timeout=60)
+        self.user_id = str(user_id)
+        self.pet_data = pet_data
+        self.cenario = cenario
+        self.progresso = progresso_diario
 
-        if user_id not in pets:
-            return await interaction.response.send_message("❌ Adote um Pet com `/pet_adotar` primeiro!", ephemeral=True)
+    @discord.ui.button(label="⚔️ Atacar Monstro", style=discord.ButtonStyle.danger)
+    async def atacar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if str(interaction.user.id) != self.user_id:
+            return await interaction.response.send_message("❌ Esta exploração não é sua!", ephemeral=True)
 
-        pet = pets[user_id]
-        pet.setdefault("inventario", {"pocao": 0})
+        await interaction.response.defer()
 
-        if pet["level"] < 15:
-            return await interaction.response.send_message(
-                f"🔒 **Acesso Negado!** A exploração da guilda é extrema. Seu Pet precisa ser **Nível 15+** (Nível atual: {pet['level']}).", 
-                ephemeral=True
+        st = self.pet_data["stats"]
+        mob = self.cenario
+        
+        dano_pet = max(5, st["atq"] - mob["def"]) + random.randint(1, 10)
+        self.pet_data["exploracao_hoje"] = self.progresso + 1
+        
+        if dano_pet >= (mob["hp"] / 3):
+            xp_ganho = mob["xp"]
+            gold_ganho = mob["gold"]
+            
+            self.pet_data["xp"] += xp_ganho
+            lvl = self.pet_data["level"]
+            xp_necessario = (lvl * 300) if lvl >= 20 else (lvl * 100)
+            
+            subiu = False
+            if self.pet_data["xp"] >= xp_necessario:
+                self.pet_data["xp"] -= xp_necessario
+                self.pet_data["level"] += 1
+                subiu = True
+
+            economy.add_gold(interaction.user.id, gold_ganho)
+            data = load_data()
+            data[self.user_id] = self.pet_data
+            save_data(data)
+
+            txt_resultado = f"✅ **Vitória!** Você derrotou o **{mob['mob']}**!\n🎁 **Recompensas:** +{xp_ganho} XP | +{gold_ganho} Golds"
+            if subiu:
+                txt_resultado += f"\n🎊 **LEVEL UP!** Seu pet alcançou o **Nível {self.pet_data['level']}**!"
+            
+            if self.pet_data["exploracao_hoje"] < 10:
+                novo_cenario = random.choice(CENARIOS_GUILDA)
+                prox_view = ExplorarView(self.user_id, self.pet_data, novo_cenario, self.pet_data["exploracao_hoje"])
+                
+                embed_prox = discord.Embed(
+                    title=f"🗺️ Exploração em Cadeia [{self.pet_data['exploracao_hoje']}/10]",
+                    description=f"{txt_resultado}\n\n---\n🌳 **Novo Bioma:** `{novo_cenario['bioma']}`\n👹 **Monstro:** `{novo_cenario['mob']}` (XP: {novo_cenario['xp']} | Gold: {novo_cenario['gold']})\n\nO que deseja fazer?",
+                    color=discord.Color.green()
+                )
+                await interaction.edit_original_response(embed=embed_prox, view=prox_view)
+            else:
+                embed_fim = discord.Embed(
+                    title="🏁 Exploração Diária Concluída!",
+                    description=f"{txt_resultado}\n\n✨ Você atingiu o limite de **10/10 explorações hoje**. Volte amanhã!",
+                    color=discord.Color.gold()
+                )
+                await interaction.edit_original_response(embed=embed_fim, view=None)
+        else:
+            data = load_data()
+            data[self.user_id] = self.pet_data
+            save_data(data)
+            embed_derrota = discord.Embed(
+                title="💀 Derrotado na Exploração...",
+                description=f"O **{mob['mob']}** era forte demais! Seu pet recuou para se recuperar.",
+                color=discord.Color.red()
             )
+            await interaction.edit_original_response(embed=embed_derrota, view=None)
 
-        hoje = pet.get("exploracao_hoje", 0)
-        if hoje >= 10:
-            return await interaction.response.send_message("⏳ Você já completou suas **10 explorações diárias**. Volte amanhã!", ephemeral=True)
+    @discord.ui.button(label="🧪 Usar Poção", style=discord.ButtonStyle.success)
+    async def usar_pocao(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if str(interaction.user.id) != self.user_id:
+            return await interaction.response.send_message("❌ Esta exploração não é sua!", ephemeral=True)
 
-        cenario_inicial = random.choice(CENARIOS_GUILDA)
-        view = ExplorarView(user_id, pet, cenario_inicial, hoje)
+        inv = self.pet_data.setdefault("inventario", {"pocao": 0})
+        if inv.get("pocao", 0) <= 0:
+            return await interaction.response.send_message("❌ Você não tem nenhuma **🧪 Poção de Cura** na sua mochila! Compre na `/loja`.", ephemeral=True)
 
-        embed = discord.Embed(
-            title=f"🗺️ Exploração da Guilda [{hoje + 1}/10]",
-            description=(
-                f"📍 **Ambiente:** `{cenario_inicial['bioma']}`\n"
-                f"👹 **Monstro Localizado:** `{cenario_inicial['mob']}`\n"
-                f"⭐ **XP Estimado:** `{cenario_inicial['xp']}` | 💰 **Gold Estimado:** `{cenario_inicial['gold']}`\n\n"
-                f"🎒 **Sua Mochila:** `🧪 {pet['inventario'].get('pocao', 0)} Poções`\n"
-                "Escolha se deseja batalhar agora ou continuar explorando o mapa:"
-            ),
-            color=discord.Color.dark_purple()
-        )
+        inv["pocao"] -= 1
+        st = self.pet_data["stats"]
+        st["hp_atual"] = min(st["hp_max"], st["hp_atual"] + 50)
+        
+        data = load_data()
+        data[self.user_id] = self.pet_data
+        save_data(data)
 
-        await interaction.response.send_message(embed=embed, view=view)
+        # Atualiza a mensagem avisando que usou a poção e atualiza os dados visuais se precisar
+        await interaction.response.send_message(f"🧪 **Poção Usada!** O HP de {self.pet_data['nome']} foi restaurado para `{st['hp_atual']}/{st['hp_max']}`! (Restantes: {inv['pocao']})", ephemeral=True)
+
+    @discord.ui.button(label="🏃 Continuar Explorando", style=discord.ButtonStyle.secondary)
+    async def pular(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if str(interaction.user.id) != self.user_id:
+            return await interaction.response.send_message("❌ Esta exploração não é sua!", ephemeral=True)
+
+        await interaction.response.defer()
+
+        self.pet_data["exploracao_hoje"] = self.progresso + 1
+        data = load_data()
+        data[self.user_id] = self.pet_data
+        save_data(data)
+
+        if self.pet_data["exploracao_hoje"] < 10:
+            novo_cenario = random.choice(CENARIOS_GUILDA)
+            prox_view = ExplorarView(self.user_id, self.pet_data, novo_cenario, self.pet_data["exploracao_hoje"])
+            
+            embed = discord.Embed(
+                title=f"🗺️ Exploração em Cadeia [{self.pet_data['exploracao_hoje']}/10]",
+                description=f"🏃 Você ignorou o perigo anterior e avançou...\n\n🌳 **Novo Bioma:** `{novo_cenario['bioma']}`\n👹 **Monstro:** `{novo_cenario['mob']}` (XP: {novo_cenario['xp']} | Gold: {novo_cenario['gold']})\n\nO que deseja fazer?",
+                color=discord.Color.blue()
+            )
+            await interaction.edit_original_response(embed=embed, view=prox_view)
+        else:
+            embed_fim = discord.Embed(
+                title="🏁 Exploração Diária Concluída!",
+                description="✨ Você ignorou o encontro e atingiu o limite de **10/10 explorações hoje**.",
+                color=discord.Color.gold()
+            )
+            await interaction.edit_original_response(embed=embed_fim, view=None)
 
     # 3. COMANDO: /loja (LOJA DE ITENS COM REAJUSTE DE +60 GOLDS)
     @app_commands.command(name="loja", description="Compre itens com seus Golds para melhorar seu Pet!")
