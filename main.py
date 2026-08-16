@@ -49,15 +49,75 @@ CATEGORIAS_VALIDAS = [
     "🛡️ Moderação & Gestão"
 ]
 
+COMANDOS_INICIAIS_PADRAO = {
+    "🐾 Sistema de Pets & RPG": {
+        "/daily": "Coleta sua recompensa diária de Golds.",
+        "/foguinho": "Testa sua sorte no jogo do foguinho.",
+        "/masmorra": "Enfrente monstros nas profundezas por recompensas.",
+        "/pet": "Cuide do seu companheiro de batalha.",
+        "/explorar": "Explora biomas perigosos (Requer Nível 20+).",
+        "/velha": "Desafie outro membro para um X1 de Jogo da Velha."
+    },
+    "💰 Economia & Carteira": {
+        "/carteira": "Consulte o seu saldo atual de Golds.",
+        "/pay": "Transfira Golds para outros usuários.",
+        "/rank": "Exibe o TOP 10 dos membros mais ricos do servidor."
+    },
+    "🛠️ Utilitários & IAs": {
+        "/gemini": "Pergunta algo para a IA do Google (Gemini 2.5 Flash).",
+        "/chatgpt": "Pergunta algo para o ChatGPT (GPT-4o-mini).",
+        "/ping": "Exibe a latência de conexão do bot.",
+        "/userinfo": "Mostra datas, ID e cargos de um membro.",
+        "/serverinfo": "Mostra informações completas do servidor.",
+        "/avatar": "Baixa e exibe a foto de perfil de um membro.",
+        "/embed": "Cria uma caixa de mensagem formatada.",
+        "/enquete": "Inicia uma votação por reações (👍 / 👎).",
+        "/lembrete": "Programa um aviso com contagem regressiva.",
+        "/moeda": "Sorteia entre Cara ou Coroa."
+    },
+    "🛒 Vendas & Tickets": {
+        "/fixar_produto": "Fixa o anúncio de um produto com botão de compra.",
+        "/painelticket": "Envia o painel fixo de suporte e atendimento geral."
+    },
+    "🎫 Atendimento & Registro": {
+        "/set_chat_filtracao": "Configura o canal onde os membros digitam a senha.",
+        "/set_passe_cargo": "Associa uma palavra-passe a um cargo automático."
+    },
+    "🛡️ Moderação & Gestão": {
+        "/setup_servidor": "Cria a estrutura completa de canais do servidor.",
+        "/setup_rpg": "Cria isoladamente a categoria e canais do RPG Yggdrasil.",
+        "/limpar": "Apaga mensagens em massa no canal.",
+        "/limparuser": "Apaga mensagens de um usuário específico.",
+        "/kick": "Expulsa um membro do servidor.",
+        "/ban": "Bane um membro do servidor.",
+        "/mute": "Silencia um membro temporariamente por minutos.",
+        "/unmute": "Remove o silêncio de um membro.",
+        "/warn": "Aplica uma advertência privada no PV do usuário.",
+        "/addcargo": "Adiciona um cargo a um membro.",
+        "/removecargo": "Remove um cargo de um membro.",
+        "/nick": "Altera o apelido de um membro no servidor.",
+        "/lock": "Tranca o canal atual para os membros.",
+        "/unlock": "Destranca o canal atual.",
+        "/anuncio": "Envia uma mensagem oficial formatada em canal específico.",
+        "/sorteio": "Sorteia um membro aleatório do servidor.",
+        "/criar_canal": "Cria um novo canal com nome decorado e personalizado.",
+        "/renomear_canal": "Altera o nome de um canal para um novo formato/decorado.",
+        "/adc_comando": "[ADMIN] Adiciona um novo comando dinamicamente ao menu."
+    }
+}
+
 def load_json(file_path, default):
     if not os.path.exists(file_path):
+        if file_path == DB_AJUDA:
+            save_json(DB_AJUDA, COMANDOS_INICIAIS_PADRAO)
+            return COMANDOS_INICIAIS_PADRAO
         return default
     with open(file_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 def save_json(file_path, data):
     with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 @bot.event
 async def on_ready():
@@ -710,7 +770,7 @@ class AjudaView(discord.ui.View):
         )
 
         if not comandos_categoria:
-            embed.add_field(name="Vazio", value="Nenhum comando cadastrado via `/adc_comando` nesta categoria ainda.", inline=False)
+            embed.add_field(name="Vazio", value="Nenhum comando cadastrado nesta categoria ainda.", inline=False)
         else:
             for cmd, desc in comandos_categoria.items():
                 embed.add_field(name=cmd, value=desc, inline=False)
