@@ -221,15 +221,16 @@ class PetRPG(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    def _load_pets(self):
+        return load_data()
+
     @app_commands.command(name="foguinho", description="🔥 Invoca o poder do pet Foguinho/Faisquinha.")
     async def foguinho(self, interaction: discord.Interaction):
-        # Evita o erro de timeout do Discord enquanto processa os dados
         await interaction.response.defer()
 
         user_id = str(interaction.user.id)
         pets_data = self._load_pets()
 
-        # Verifica se o usuário tem o pet cadastrado
         if user_id not in pets_data:
             return await interaction.followup.send("⚠️ Você ainda não possui um pet registrado no sistema!")
 
@@ -253,9 +254,6 @@ class PetRPG(commands.Cog):
         embed.add_field(name="💨 Agilidade", value=str(stats.get('agi', 0)), inline=True)
 
         await interaction.followup.send(embed=embed)
-
-async def setup(bot: commands.Bot):
-    await bot.add_cog(FoguinhoCog(bot))
 
     # 1. COMANDO: /masmorra
     @app_commands.command(name="masmorra", description="Enfrente monstros em uma masmorra para ganhar XP e Golds!")
@@ -442,12 +440,11 @@ async def setup(bot: commands.Bot):
         pet = data[user_id]
         pet.setdefault("inventario", {"pocao": 0})
         
-        # Tabela de preços com +60 Golds aplicados aos valores anteriores
         precos = {
-            "pocao": 129,    # Antes: 69
-            "racao": 175,    # Antes: 115
-            "elixir": 291,   # Antes: 231
-            "amuleto": 348   # Antes: 288
+            "pocao": 129,
+            "racao": 175,
+            "elixir": 291,
+            "amuleto": 348
         }
         
         nomes_itens = {
@@ -510,7 +507,7 @@ async def setup(bot: commands.Bot):
 
         await interaction.response.send_message(embed=embed)
     
-   # 4. COMANDO: /top_pets (LENDO DIRECTAMENTE DE PETS.JSON)
+    # 4. COMANDO: /top_pets
     @app_commands.command(name="top_pets", description="Exibe o ranking global dos Pets mais fortes do servidor!")
     async def top_pets(self, interaction: discord.Interaction):
         await interaction.response.defer()
@@ -521,7 +518,6 @@ async def setup(bot: commands.Bot):
             if not data:
                 return await interaction.followup.send("📊 Nenhum Pet encontrado em `pets.json`!", ephemeral=True)
 
-            # Ordena pelos pets de maior Level e XP
             sorted_pets = sorted(
                 data.items(), 
                 key=lambda item: (item[1].get("level", 1), item[1].get("xp", 0)), 
@@ -534,7 +530,6 @@ async def setup(bot: commands.Bot):
             for index, (uid, pet) in enumerate(sorted_pets[:10], start=1):
                 emoji = medals[index - 1] if index <= 3 else f"`#{index}`"
                 
-                # Resgate do dono no Discord
                 user = self.bot.get_user(int(uid))
                 if user:
                     dono_nome = user.display_name
@@ -545,7 +540,6 @@ async def setup(bot: commands.Bot):
                     except Exception:
                         dono_nome = f"Treinador_{uid[-4:]}"
                 
-                # Dados lidos do JSON
                 nome = pet.get("nome", "Pet sem nome")
                 raca = pet.get("raça", "Desconhecida")
                 elemento = pet.get("elemento", "Nenhum").capitalize()
@@ -678,5 +672,5 @@ async def setup(bot: commands.Bot):
         await interaction.response.send_message(embed=embed)
 
 
-async def setup(bot):
+async def setup(bot: commands.Bot):
     await bot.add_cog(PetRPG(bot))
