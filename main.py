@@ -636,23 +636,52 @@ async def serverinfo(interaction: discord.Interaction):
 
 
 # ==========================================
-# 📚 MENU DE AJUDA INTERATIVO (SEM IMAGENS)
+# 📚 MENU DE AJUDA INTERATIVO ATUALIZADO
 # ==========================================
-class HelpSelect(discord.ui.Select):
+class AjudaView(discord.ui.View):
     def __init__(self):
-        options = [
-            discord.SelectOption(label="Utilitários & IAs", description="Comandos gerais, perfil e Inteligências Artificiais", emoji="🛠️", value="util"),
-            discord.SelectOption(label="Economia & RPG Pets", description="Golds, carteira, masmorras, duelos e loja", emoji="🪙", value="eco"),
-            discord.SelectOption(label="Vendas & Tickets", description="Sistemas de suporte e anúncios de produtos", emoji="🛒", value="vendas"),
-            discord.SelectOption(label="Atendimento & Registro", description="Configurações de suporte e filtração por senha", emoji="🎫", value="atendimento"),
-            discord.SelectOption(label="Moderação & Gestão", description="Comandos de administração do servidor", emoji="🛡️", value="mod"),
+        super().__init__(timeout=180)
+
+    @discord.ui.select(
+        placeholder="📂 Escolha uma categoria de comandos...",
+        min_values=1,
+        max_values=1,
+        options=[
+            discord.SelectOption(label="🐾 Sistema de Pets & RPG", description="Comandos de adoção, perfil, loja, inventário e exploração.", emoji="🐉"),
+            discord.SelectOption(label="💰 Economia & Carteira", description="Comandos de saldo, pix, pagamentos e rank de golds.", emoji="💳"),
+            discord.SelectOption(label="🛠️ Utilitários & IAs", description="Comandos gerais, perfil e Inteligências Artificiais", emoji="🛠️"),
+            discord.SelectOption(label="🛒 Vendas & Tickets", description="Sistemas de suporte e anúncios de produtos", emoji="🛒"),
+            discord.SelectOption(label="🎫 Atendimento & Registro", description="Configurações de suporte e filtração por senha", emoji="🎫"),
+            discord.SelectOption(label="🛡️ Moderação & Gestão", description="Comandos de administração do servidor", emoji="🛡️")
         ]
-        super().__init__(placeholder="📂 Selecione uma categoria para explorar...", min_values=1, max_values=1, options=options)
+    )
+    async def selecionar_categoria(self, interaction: discord.Interaction, select: discord.ui.Select):
+        opcao = select.values[0]
 
-    async def callback(self, interaction: discord.Interaction):
-        escolha = self.values[0]
+        if opcao == "🐾 Sistema de Pets & RPG":
+            embed = discord.Embed(
+                title="🐾 Central de Ajuda — RPG & Pets",
+                description="Gerencie seu companheiro de Yggdrasil com os comandos abaixo:",
+                color=discord.Color.green()
+            )
+            embed.add_field(name="/pet_adotar", value="Adote seu pet inicial (Fogo, Água ou Trovão).", inline=False)
+            embed.add_field(name="/pet_perfil", value="Exibe os status, vida, XP e nível atual do seu pet.", inline=False)
+            embed.add_field(name="/inventario", value="Acesse sua mochila para ver poções, rações e itens guardados.", inline=False)
+            embed.add_field(name="/loja", value="Compre itens especiais usando seus Golds.", inline=False)
+            embed.add_field(name="/masmorra", value="Enfrente monstros nas profundezas por recompensas.", inline=False)
+            embed.add_field(name="/explorar", value="Explore biomas perigosos (Requer Nível 20+).", inline=False)
 
-        if escolha == "util":
+        elif opcao == "💰 Economia & Carteira":
+            embed = discord.Embed(
+                title="💰 Central de Ajuda — Economia",
+                description="Gerencie suas finanças e Golds no servidor:",
+                color=discord.Color.gold()
+            )
+            embed.add_field(name="/carteira", value="Consulte o seu saldo atual de Golds.", inline=False)
+            embed.add_field(name="/pay", value="Transfira Golds para outros usuários.", inline=False)
+            embed.add_field(name="/rank", value="Veja o ranking dos membros mais ricos do servidor.", inline=False)
+
+        elif opcao == "🛠️ Utilitários & IAs":
             embed = discord.Embed(
                 title="🛠️ Utilitários & Inteligências Artificiais",
                 description=(
@@ -670,26 +699,7 @@ class HelpSelect(discord.ui.Select):
                 color=discord.Color.blue()
             )
 
-        elif escolha == "eco":
-            embed = discord.Embed(
-                title="🪙 Economia & RPG Yggdrasil",
-                description=(
-                    "• `/carteira` — Vê o seu saldo individual em Golds\n"
-                    "• `/daily` — Coleta a recompensa diária de moedas\n"
-                    "• `/pay` — Transfere moedas para outro usuário\n"
-                    "• `/rank` — Exibe o TOP 10 dos membros mais ricos\n"
-                    "• `/velha` — Desafia um membro para o Jogo da Velha\n"
-                    "• `/pet_adotar` — Escolha o seu Pet inicial (Fogo/Água/Trovão)\n"
-                    "• `/foguinho` — Alimenta e dá XP diário ao seu Pet\n"
-                    "• `/pet_perfil` — Exibe os status, vida e vitórias do seu Pet\n"
-                    "• `/masmorra` — Enfrenta monstros em batalhas por recompensas\n"
-                    "• `/duelar` — Desafia outro jogador valendo prêmio em Golds\n"
-                    "• `/loja` — Compra poções, rações de XP e amuletos"
-                ),
-                color=discord.Color.gold()
-            )
-
-        elif escolha == "vendas":
+        elif opcao == "🛒 Vendas & Tickets":
             embed = discord.Embed(
                 title="🛒 Loja & Vendas",
                 description=(
@@ -699,7 +709,7 @@ class HelpSelect(discord.ui.Select):
                 color=discord.Color.green()
             )
 
-        elif escolha == "atendimento":
+        elif opcao == "🎫 Atendimento & Registro":
             embed = discord.Embed(
                 title="🎫 Atendimento & Registro por Senha",
                 description=(
@@ -709,7 +719,7 @@ class HelpSelect(discord.ui.Select):
                 color=discord.Color.purple()
             )
 
-        elif escolha == "mod":
+        elif opcao == "🛡️ Moderação & Gestão":
             embed = discord.Embed(
                 title="🛡️ Moderação & Gestão do Servidor",
                 description=(
@@ -735,12 +745,6 @@ class HelpSelect(discord.ui.Select):
         await interaction.response.edit_message(embed=embed, view=self.view)
 
 
-class HelpView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=180)
-        self.add_item(HelpSelect())
-
-
 @bot.tree.command(name="ajuda", description="Central de ajuda interativa do bot")
 async def ajuda(interaction: discord.Interaction):
     embed = discord.Embed(
@@ -754,7 +758,8 @@ async def ajuda(interaction: discord.Interaction):
     )
     embed.set_footer(text="Escolha uma categoria abaixo para navegar.")
 
-    await interaction.response.send_message(embed=embed, view=HelpView())
+    view = AjudaView()
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
 @bot.tree.command(name="avatar", description="Manda o avatar de um membro")
