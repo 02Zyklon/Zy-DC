@@ -319,6 +319,51 @@ class PetRPG(commands.Cog):
 
         await interaction.followup.send(embed=embed)
 
+    @app_commands.command(name="pet_adotar", description="Adote um novo Pet para iniciar suas aventuras!")
+    async def pet_adotar(self, interaction: discord.Interaction, nome: str, raca: str, elemento: str):
+        # 1. Responde imediatamente ao Discord para evitar o erro de "Aplicativo não respondeu"
+        await interaction.response.defer(ephemeral=True)
+
+        user_id = str(interaction.user.id)
+        pets_data = load_data()
+
+        if user_id in pets_data:
+            return await interaction.followup.send("❌ Você já possui um Pet registrado! Use `/foguinho` para ver seus status.")
+
+        # 2. Criação do pet com atributos iniciais seguros
+        pets_data[user_id] = {
+            "nome": nome,
+            "raça": raca,
+            "elemento": elemento.lower(),
+            "level": 1,
+            "xp": 0,
+            "stats": {
+                "hp_max": 100,
+                "hp_atual": 100,
+                "atq": 15,
+                "defesa": 5,
+                "agi": 10
+            },
+            "inventario": {"pocao": 1},
+            "historico": {"vitorias": 0, "derrotas": 0}
+        }
+
+        save_data(pets_data)
+
+        # 3. Envia a resposta final com segurança via followup
+        embed = discord.Embed(
+            title="🎉 ADOÇÃO REALIZADA COM SUCESSO!",
+            description=(
+                f"Parabéns! Você adotou o seu novo companheiro:\n\n"
+                f"🐾 **Nome:** `{nome}`\n"
+                f"🧬 **Raça:** `{raca}`\n"
+                f"🔮 **Elemento:** `{elemento.capitalize()}`\n\n"
+                "Use `/foguinho` para ver os detalhes ou vá para `/masmorra`!"
+            ),
+            color=discord.Color.green()
+        )
+        await interaction.followup.send(embed=embed)
+
     # 2. COMANDO: /daily (Recompensa diária protegida contra fraude)
     @app_commands.command(name="daily", description="🎁 Coleta sua recompensa diária em Golds para o seu pet!")
     async def daily(self, interaction: discord.Interaction):
