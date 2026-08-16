@@ -2,6 +2,7 @@ import os
 import json
 import random
 import datetime
+import time
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -98,7 +99,8 @@ class PetRPG(commands.Cog):
             "xp": 0,
             "vida": 100,
             "vitorias": 0,
-            "convite_enviado": False
+            "convite_enviado": False,
+            "inventario": {"cura": 0, "racao": 0, "elixir": 0, "amuleto": 0}
         }
         save_rpg_db(db)
 
@@ -132,6 +134,106 @@ class PetRPG(commands.Cog):
         embed.add_field(name="Vitórias", value=f"`{pet.get('vitorias', 0)}`", inline=True)
 
         await interaction.followup.send(embed=embed)
+
+    @app_commands.command(name="inventario", description="Veja os itens e consumíveis guardados na sua mochila.")
+    async def inventario(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        db = load_rpg_db()
+        user_id = str(interaction.user.id)
+
+        if user_id not in db["pets"]:
+            return await interaction.followup.send("⚠️ Você precisa adotar um pet primeiro para ter um inventário! Use `/pet_adotar`.", ephemeral=True)
+
+        pet = db["pets"][user_id]
+        
+        if "inventario" not in pet:
+            pet["inventario"] = {"cura": 0, "racao": 0, "elixir": 0, "amuleto": 0}
+            save_rpg_db(db)
+
+        inv = pet["inventario"]
+
+        embed = discord.Embed(
+            title=f"🎒 Mochila de {interaction.user.display_name}",
+            description="Aqui estão os itens que você guarda para auxiliar o seu pet nas aventuras:",
+            color=discord.Color.blue()
+        )
+        embed.add_field(name="🧪 Poção de Cura", value=f"` {inv.get('cura', 0)}x `", inline=True)
+        embed.add_field(name="🍖 Super Ração", value=f"` {inv.get('racao', 0)}x `", inline=True)
+        embed.add_field(name="⚡ Elixir de Agilidade", value=f"` {inv.get('elixir', 0)}x `", inline=True)
+        embed.add_field(name="🛡️ Amuleto de Força", value=f"` {inv.get('amuleto', 0)}x `", inline=True)
+        
+        embed.set_footer(text="Use os itens estrategicamente antes de explorar ou entrar nas masmorras!")
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="loja", description="Adquira itens especiais para guardar na mochila usando seus Golds.")
+    @app_commands.choices(item=[
+        app_commands.Choice(name="🧪 Poção de Cura (129 Golds)", value="cura"),
+        app_commands.Choice(name="🍖 Super Ração (175 Golds)", value="racao"),
+        app_commands.Choice(name="⚡ Elixir de Agilidade (291 Golds)", value="elixir"),
+        app_commands.Choice(name="🛡️ Amuleto de Força (348 Golds)", value="amuleto")
+    ])
+    async def loja(self, interaction: discord.Interaction, item: app_commands.Choice[str]):
+        await interaction.response.defer(ephemeral=True)
+
+        db = load_rpg_db()
+        user_id = str(interaction.user.id)
+
+        if user_id not in db["pets"]:
+            return await interaction.followup.send("⚠️ Você precisa adotar um pet primeiro para comprar itens! Use `/pet_adotar`.", ephemeral=True)
+
+        pet = db["pets"][user_id]
+
+        precos = {
+            "cura": 129,
+            "racao": 175,
+            "elixir": 291,
+            "amuleto": 348
+        }
+
+        custo = precos[item.value]
+        saldo_atual = economy.get_gold(interaction.user.id)
+
+        if saldo_atual < custo:
+            return await interaction.followup.send(
+                f"❌ **Saldo Insuficiente!** Você tem `{saldo_atual:,} Golds`, mas este item custa `{custo:,} Golds`.",
+                ephemeral=True
+            )
+
+        if not economy.remove_gold(interaction.user.id, custo):
+            return await interaction.followup.send("❌ Erro ao processar o pagamento na sua carteira.", ephemeral=True)
+
+        if "inventario" not in pet:
+            pet["inventario"] = {"cura": 0, "racao": 0, "elixir": 0, "amuleto": 0}
+        
+        pet["inventario"][item.value] = pet["inventario"].get(item.value, 0) + 1
+        save_rpg_db(db)
+
+        embed = discord.Embed(
+            title="🛒 Compra Realizada com Sucesso!",
+            description=f"Você adquiriu **{item.name}** por **{custo} Golds**.\nO item foi guardado com segurança na sua mochila (`/inventario`).",
+            color=discord.Color.green()
+        )
+        embed.set_footer(text=f"Saldo restante: {economy.get_gold(interaction.user.id):,} Golds")
+        
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+        # Log automático para a staff em itens de alto valor
+        if custo >= 250:
+            try:
+                log_channel = discord.utils.get(interaction.guild.text_channels, name="📡・bot-logs")
+                if log_channel:
+                    log_embed = discord.Embed(
+                        title="📊 Log de Economia / Loja",
+                        description=f"O usuário **{interaction.user}** (`{interaction.user.id}`) comprou um item de alto valor.",
+                        color=discord.Color.orange()
+                    )
+                    log_embed.add_field(name="Item", value=item.name, inline=True)
+                    log_embed.add_field(name="Valor Gasto", value=f"{custo} Golds", inline=True)
+                    log_embed.set_timestamp()
+                    await log_channel.send(embed=log_embed)
+            except Exception as e:
+                print(f"Erro ao enviar log de loja: {e}")
 
     @app_commands.command(name="masmorra", description="Enfrente monstros nas profundezas de Yggdrasil por recompensas.")
     @app_commands.checks.cooldown(1, 300, key=lambda i: i.user.id) # 5 minutos de cooldown
