@@ -63,7 +63,7 @@ async def on_ready():
 
 async def setup_hook():
     # Substitua "nome_do_arquivo_rpg" pelo nome exato do seu arquivo RPG (sem o .py)
-    await bot.load_extension("nome_do_arquivo_rpg")
+    await bot.load_extension("pet_rpg.py")
 
 bot.setup_hook = setup_hook
 
