@@ -61,11 +61,6 @@ async def on_ready():
     
     print(f"🤖 Bot online e sincronizado com sucesso como: {bot.user}")
 
-async def setup_hook():
-    # Substitua "nome_do_arquivo_rpg" pelo nome exato do seu arquivo RPG (sem o .py)
-    await bot.load_extension("pet_rpg")
-
-bot.setup_hook = setup_hook
 
 # =========================================================
 # ⚡ COMANDO DE SINCRONIZAÇÃO DINÂMICA
