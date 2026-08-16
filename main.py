@@ -174,18 +174,6 @@ async def carteira(interaction: discord.Interaction, usuario: discord.Member = N
     embed.add_field(name="💰 Saldo em Golds", value=f"`{saldo:,}` 📀", inline=False)
     await interaction.response.send_message(embed=embed)
 
-@bot.tree.command(name="daily", description="Resgate sua recompensa diária de Golds.")
-async def daily(interaction: discord.Interaction):
-    reward = random.randint(250, 600)
-    novo_saldo = economy.add_gold(interaction.user.id, reward)
-
-    embed = discord.Embed(
-        title="🎁 Recompensa Diária Coletada!",
-        description=f"Você recebeu **+{reward:,}** Golds 📀!",
-        color=discord.Color.green()
-    )
-    embed.add_field(name="Novo Saldo", value=f"`{novo_saldo:,}` 📀")
-    await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="pay", description="Transfira Golds para outro usuário.")
 async def pay(interaction: discord.Interaction, destino: discord.Member, quantia: int):
