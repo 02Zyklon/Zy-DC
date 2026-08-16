@@ -280,7 +280,47 @@ class PetRPG(commands.Cog):
 
     def _load_pets(self):
         return load_data()
+              
+    # 1. COMANDO: /foguinho (Protegido com bloqueio de 1 uso diário)
+    @app_commands.command(name="foguinho", description="🔥 Invoca o poder e status diário do seu pet.")
+    async def foguinho(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        user_id = str(interaction.user.id)
+        pets_data = self._load_pets()
+
+        if user_id not in pets_data:
+            return await interaction.followup.send("⚠️ Você ainda não possui um pet registrado no sistema!")
+
+        pet = pets_data[user_id]
+
+        # Trava de uso diário para o foguinho/recompensa
+        data_atual = datetime.now().strftime("%Y-%m-%d")
+        if pet.get("ultima_foguinho_data") == data_atual:
+            return await interaction.followup.send("⏳ Você já consultou o `/foguinho` hoje! Volte amanhã para renovar as energias.")
+
+        pet["ultima_foguinho_data"] = data_atual
+        save_data(pets_data)
+
+        embed = discord.Embed(
+            title=f"🔥 Painel do Pet: {pet.get('nome', 'Foguinho')}",
+            description=f"**Raça:** {pet.get('raça', 'Faisquinha')}\n**Elemento:** `{pet.get('elemento', 'fogo')}`",
+            color=discord.Color.orange()
+        )
         
+        if pet.get('midia'):
+            embed.set_thumbnail(url=pet.get('midia'))
+
+        stats = pet.get("stats", {})
+        embed.add_field(name="⭐ Nível", value=str(pet.get("level", 1)), inline=True)
+        embed.add_field(name="✨ XP", value=str(pet.get("xp", 0)), inline=True)
+        embed.add_field(name="❤️ HP", value=f"{stats.get('hp_atual', 100)}/{stats.get('hp_max', 100)}", inline=True)
+        embed.add_field(name="⚔️ Ataque", value=str(stats.get('atq', 0)), inline=True)
+        embed.add_field(name="🛡️ Defesa", value=str(stats.get('defesa', 0)), inline=True)
+        embed.add_field(name="💨 Agilidade", value=str(stats.get('agi', 0)), inline=True)
+
+        await interaction.followup.send(embed=embed)
+
 # COMANDO: /pet_adotar
     @app_commands.command(name="pet_adotar", description="Adote um novo Pet para iniciar suas aventuras!")
     async def pet_adotar(self, interaction: discord.Interaction, nome: str, raca: str, elemento: str):
@@ -324,47 +364,6 @@ class PetRPG(commands.Cog):
         )
         await interaction.followup.send(embed=embed)
         
-    # 1. COMANDO: /foguinho (Protegido com bloqueio de 1 uso diário)
-    @app_commands.command(name="foguinho", description="🔥 Invoca o poder e status diário do seu pet.")
-    async def foguinho(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-
-        user_id = str(interaction.user.id)
-        pets_data = self._load_pets()
-
-        if user_id not in pets_data:
-            return await interaction.followup.send("⚠️ Você ainda não possui um pet registrado no sistema!")
-
-        pet = pets_data[user_id]
-
-        # Trava de uso diário para o foguinho/recompensa
-        data_atual = datetime.now().strftime("%Y-%m-%d")
-        if pet.get("ultima_foguinho_data") == data_atual:
-            return await interaction.followup.send("⏳ Você já consultou o `/foguinho` hoje! Volte amanhã para renovar as energias.")
-
-        pet["ultima_foguinho_data"] = data_atual
-        save_data(pets_data)
-
-        embed = discord.Embed(
-            title=f"🔥 Painel do Pet: {pet.get('nome', 'Foguinho')}",
-            description=f"**Raça:** {pet.get('raça', 'Faisquinha')}\n**Elemento:** `{pet.get('elemento', 'fogo')}`",
-            color=discord.Color.orange()
-        )
-        
-        if pet.get('midia'):
-            embed.set_thumbnail(url=pet.get('midia'))
-
-        stats = pet.get("stats", {})
-        embed.add_field(name="⭐ Nível", value=str(pet.get("level", 1)), inline=True)
-        embed.add_field(name="✨ XP", value=str(pet.get("xp", 0)), inline=True)
-        embed.add_field(name="❤️ HP", value=f"{stats.get('hp_atual', 100)}/{stats.get('hp_max', 100)}", inline=True)
-        embed.add_field(name="⚔️ Ataque", value=str(stats.get('atq', 0)), inline=True)
-        embed.add_field(name="🛡️ Defesa", value=str(stats.get('defesa', 0)), inline=True)
-        embed.add_field(name="💨 Agilidade", value=str(stats.get('agi', 0)), inline=True)
-
-        await interaction.followup.send(embed=embed)
-
-
     # 2. COMANDO: /daily (Recompensa diária protegida contra fraude)
     @app_commands.command(name="daily", description="🎁 Coleta sua recompensa diária em Golds para o seu pet!")
     async def daily(self, interaction: discord.Interaction):
