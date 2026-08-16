@@ -9,6 +9,10 @@ import economy  # Certifique-se de que o economy.py está na mesma pasta
 
 DB_RPG = "config_rpg.json"
 
+# IDs configurados para o sistema de Aventureiro
+CARGO_AVENTUREIRO_ID = 1538666697849045092
+CANAL_ESPECIFICO_ID = 1538229136898662500
+
 def load_rpg_db():
     if not os.path.exists(DB_RPG):
         return {"pets": {}, "masmorras": {}}
@@ -18,6 +22,49 @@ def load_rpg_db():
 def save_rpg_db(data):
     with open(DB_RPG, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
+
+class AventureiroConfirmView(discord.ui.View):
+    def __init__(self, cargo_aventureiro_id: int, canal_liberar_id: int):
+        super().__init__(timeout=180) # Expira em 3 minutos
+        self.cargo_aventureiro_id = cargo_aventureiro_id
+        self.canal_liberar_id = canal_liberar_id
+
+    @discord.ui.button(label="Sim, quero ser Aventureiro!", style=discord.ButtonStyle.green, emoji="⚔️")
+    async def btn_sim(self, interaction: discord.Interaction, button: discord.ui.Button):
+        guild = interaction.guild
+        if not guild:
+            return await interaction.response.send_message("❌ Este comando deve ser usado em um servidor.", ephemeral=True)
+            
+        cargo = guild.get_role(self.cargo_aventureiro_id)
+        canal = guild.get_channel(self.canal_liberar_id)
+
+        if not cargo:
+            return await interaction.response.send_message("❌ Erro interno: O cargo de aventureiro não foi encontrado pelo ID.", ephemeral=True)
+
+        # Adiciona o cargo ao usuário
+        await interaction.user.add_roles(cargo)
+
+        # Configura permissão para ver e enviar mensagens no canal específico
+        if canal:
+            await canal.set_permissions(interaction.user, view_channel=True, send_messages=True)
+
+        for child in self.children:
+            child.disabled = True
+        
+        embed = discord.Embed(
+            title="🎉 Parabéns, Novo Aventureiro!",
+            description=f"Você aceitou o chamado! O cargo **{cargo.name}** foi adicionado e o canal {canal.mention if canal else ''} foi desbloqueado para você.",
+            color=discord.Color.gold()
+        )
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="Agora não", style=discord.ButtonStyle.red, emoji="❌")
+    async def btn_nao(self, interaction: discord.Interaction, button: discord.ui.Button):
+        for child in self.children:
+            child.disabled = True
+        
+        await interaction.response.edit_message(content="❌ Oferta recusada. Quando mudar de ideia, você poderá tentar novamente!", embed=None, view=self)
+
 
 class PetRPG(commands.Cog):
     def __init__(self, bot):
@@ -50,7 +97,8 @@ class PetRPG(commands.Cog):
             "nivel": 1,
             "xp": 0,
             "vida": 100,
-            "vitorias": 0
+            "vitorias": 0,
+            "convite_enviado": False
         }
         save_rpg_db(db)
 
@@ -79,9 +127,9 @@ class PetRPG(commands.Cog):
         )
         embed.add_field(name="Elemento", value=pet["elemento"].capitalize(), inline=True)
         embed.add_field(name="Nível", value=f"`{pet['nivel']}`", inline=True)
-        embed.add_field(name="XP", value=f"`{pet['xp']}/100`", inline=True)
-        embed.add_field(name="Vida", value=f"`{pet['vida']} HP`", inline=True)
-        embed.add_field(name="Vitórias", value=f"`{pet['vitorias']}`", inline=True)
+        embed.add_field(name="XP", value=f"`{pet['xp']}/150`", inline=True)
+        embed.add_field(name="Vida", value=f"`{pet.get('vida', 100)} HP`", inline=True)
+        embed.add_field(name="Vitórias", value=f"`{pet.get('vitorias', 0)}`", inline=True)
 
         await interaction.followup.send(embed=embed)
 
@@ -107,7 +155,7 @@ class PetRPG(commands.Cog):
             db["pets"][user_id]["xp"] += 35
 
             # Subir de nível simples
-            if db["pets"][user_id]["xp"] >= 100:
+            if db["pets"][user_id]["xp"] >= 150:
                 db["pets"][user_id]["nivel"] += 1
                 db["pets"][user_id]["xp"] = 0
                 lvl_up_txt = "\n🎉 **Seu pet subiu de nível!**"
@@ -128,6 +176,172 @@ class PetRPG(commands.Cog):
                 color=discord.Color.red()
             )
 
+        await interaction.followup.send(embed=embed)
+
+    @app_commands.command(name="explorar", description="Explore os biomas perigosos de Yggdrasil (Requer Nível 20 ou superior).")
+    @app_commands.choices(bioma=[
+        app_commands.Choice(name="🌲 Floresta Sombria", value="floresta"),
+        app_commands.Choice(name="🌋 Cavernas de Magma", value="magma"),
+        app_commands.Choice(name="❄️ Tundra Gelada", value="tundra"),
+        app_commands.Choice(name="🏰 Ruínas Ancestrais", value="ruinas")
+    ])
+    @app_commands.checks.cooldown(1, 60, key=lambda i: i.user.id)
+    async def explorar(self, interaction: discord.Interaction, bioma: app_commands.Choice[str]):
+        await interaction.response.defer()
+
+        db = load_rpg_db()
+        user_id = str(interaction.user.id)
+
+        if user_id not in db["pets"]:
+            return await interaction.followup.send("⚠️ Você precisa de um pet para explorar! Use `/pet_adotar` primeiro.", ephemeral=True)
+
+        pet = db["pets"][user_id]
+
+        # 🔒 Trava estrita de Nível 20
+        if pet.get("nivel", 1) < 20:
+            return await interaction.followup.send(
+                f"❌ **Acesso Negado!** O seu pet está no **Nível {pet.get('nivel', 1)}**.\n"
+                "Para explorar as áreas perigosas de Yggdrasil e farmar Golds, seu pet precisa ser no **mínimo Nível 20**!", 
+                ephemeral=True
+            )
+
+        # 🛑 Verifica vida crítica
+        if pet.get("vida", 100) <= 0:
+            return await interaction.followup.send("💀 O seu pet está esgotado e sem vida! Cure-o antes de voltar a explorar.", ephemeral=True)
+        
+        # 40 Monstros distribuídos em 4 biomas com alta dificuldade
+        dados_bioma = {
+            "floresta": {
+                "nome": "🌲 Floresta Sombria",
+                "cor": discord.Color.dark_green(),
+                "mobs": [
+                    "Goblin Arruaceiro", "Lobisomem Feroz", "Aranha Gigante da Bruma", "Ent Corrompido",
+                    "Javali Espinhoso", "Slime Venenoso", "Bruxa dos Pântanos", "Ladrão da Mata", 
+                    "Pantera Sombria", "Líder dos Trolls da Floresta"
+                ],
+                "chance_perigo": 0.65
+            },
+            "magma": {
+                "nome": "🌋 Cavernas de Magma",
+                "cor": discord.Color.dark_red(),
+                "mobs": [
+                    "Elemental de Fogo", "Salamandra das Cinzas", "Golem de Obsidiana", "Draconato Guardião",
+                    "Morcego Vulcânico", "Esqueleto Magmático", "Dramon Menor", "Lorde das Chamas",
+                    "Serpente de Lava", "Titã do Núcleo Fundido"
+                ],
+                "chance_perigo": 0.75
+            },
+            "tundra": {
+                "nome": "❄️ Tundra Gelada",
+                "cor": discord.Color.blue(),
+                "mobs": [
+                    "Lobo do Ártico", "Espectro de Gelo", "Yeti Selvagem", "Gigante de Frost",
+                    "Urso Polar Corrompido", "Elemental de Neve", "Arpia das Neves", "Besta Glacial",
+                    "Cavaleiro da Névoa Branca", "Dragão de Gelo Ancestral"
+                ],
+                "chance_perigo": 0.70
+            },
+            "ruinas": {
+                "nome": "🏰 Ruínas Ancestrais",
+                "cor": discord.Color.dark_purple(),
+                "mobs": [
+                    "Esqueleto Guerreiro", "Cavaleiro Sombrio", "Gárgula de Pedra", "Lich Ancestral",
+                    "Fantasma Errante", "Zumbi Desenterrado", "Golem de Ruína", "Sombra Vingativa",
+                    "Múmia Guardiã", "Rei Esqueleto Despedaçado"
+                ],
+                "chance_perigo": 0.85
+            }
+        }
+
+        info = dados_bioma[bioma.value]
+        evento_perigo = random.random() < info["chance_perigo"]
+
+        if evento_perigo:
+            monstro = random.choice(info["mobs"])
+            
+            # Fórmula de vitória equilibrada e desafiadora
+            chance_vitoria = min(0.35 + (pet["nivel"] * 0.02), 0.75)  
+            vitoria = random.random() < chance_vitoria
+
+            if vitoria:
+                ouro_ganho = random.randint(15 * pet["nivel"], 40 * pet["nivel"])
+                xp_ganho = random.randint(15, 35)
+                economy.add_gold(interaction.user.id, ouro_ganho)
+                
+                pet["vitorias"] = pet.get("vitorias", 0) + 1
+                pet["xp"] = pet.get("xp", 0) + xp_ganho
+                
+                lvl_up = False
+                if pet["xp"] >= 150:
+                    pet["nivel"] += 1
+                    pet["xp"] -= 150
+                    lvl_up = True
+                    pet["vida"] = 100
+
+                save_rpg_db(db)
+
+                embed = discord.Embed(
+                    title=f"⚔️ Vitória Difícil em {info['nome']}!",
+                    description=(
+                        f"Após um combate duríssimo, seu pet superou o feroz **{monstro}**!\n\n"
+                        f"💰 **Recompensa:** `{ouro_ganho:,}` Golds\n"
+                        f"✨ **XP Obtido:** `+{xp_ganho} XP`"
+                        f"{' \n\n🎉 **LEVEL UP! Seu pet alcançou o nível ' + str(pet['nivel']) + '!**' if lvl_up else ''}"
+                    ),
+                    color=discord.Color.green()
+                )
+            else:
+                dano_sofrido = random.randint(35, 65)
+                pet["vida"] = max(0, pet.get("vida", 100) - dano_sofrido)
+                save_rpg_db(db)
+
+                embed = discord.Embed(
+                    title=f"💀 Derrota Brutal em {info['nome']}!",
+                    description=(
+                        f"O **{monstro}** era impiedoso! Seu pet foi massacrado na batalha e teve que fugir para sobreviver.\n\n"
+                        f"💔 **Dano Sofrido:** `-{dano_sofrido} HP`\n"
+                        f"❤️ **Vida Atual do Pet:** `{pet['vida']}/100 HP`"
+                    ),
+                    color=discord.Color.red()
+                )
+        else:
+            ouro_ganho = random.randint(10, 25)
+            economy.add_gold(interaction.user.id, ouro_ganho)
+            pet["xp"] = pet.get("xp", 0) + 10
+            
+            save_rpg_db(db)
+
+            embed = discord.Embed(
+                title=f"🧭 Calmaria em {info['nome']}",
+                description=(
+                    f"Por sorte, nenhum monstro mortal atacou. Seu pet encontrou restos de provisões:\n\n"
+                    f"💰 **Achado:** `{ouro_ganho}` Golds\n"
+                    f"✨ **Experiência:** `+10 XP`"
+                ),
+                color=info["cor"]
+            )
+
+        # 🌟 Checagem automática para o cargo de Aventureiro ao atingir o Nível 20
+        if pet["nivel"] >= 20 and not pet.get("convite_enviado", False):
+            pet["convite_enviado"] = True
+            save_rpg_db(db)
+
+            convite_embed = discord.Embed(
+                title="🌟 Seu Pet Alcançou o Nível 20!",
+                description=(
+                    "O seu companheiro ficou forte o suficiente para se tornar um **Aventureiro Oficial** de Yggdrasil!\n\n"
+                    "Deseja aceitar o título de Aventureiro para desbloquear **canais exclusivos** e provar seu valor?"
+                ),
+                color=discord.Color.blurple()
+            )
+            view = AventureiroConfirmView(CARGO_AVENTUREIRO_ID, CANAL_ESPECIFICO_ID)
+            
+            try:
+                await interaction.user.send(embed=convite_embed, view=view)
+            except discord.Forbidden:
+                await interaction.followup.send(f"{interaction.user.mention}", embed=convite_embed, view=view, ephemeral=True)
+
+        embed.set_footer(text=f"Explorador: {interaction.user.display_name} • 🐾 Pet: {pet['nome']} (Nv. {pet['nivel']})")
         await interaction.followup.send(embed=embed)
 
 async def setup(bot):
