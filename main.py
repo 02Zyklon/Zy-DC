@@ -3,12 +3,12 @@ import asyncio
 import datetime
 import random
 import json
+import logging
 import discord
 from discord.ext import commands
 from discord import app_commands
 from keep_alive import keep_alive
 import economy  # 🟢 Importação do módulo unificado de Economia
-import logging
 
 # Configura logs visíveis em tempo real no Discloud
 logging.basicConfig(
@@ -16,6 +16,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[logging.StreamHandler()]
 )
+
 # =========================================================
 # CONFIGURAÇÃO E INICIALIZAÇÃO
 # =========================================================
@@ -75,6 +76,7 @@ async def sync(ctx: commands.Context, spec: str = None):
     else:
         synced = await bot.tree.sync()
         await ctx.send(f"🌐 **{len(synced)}** comandos sincronizados globalmente!")
+
 
 # =========================================================
 # 🛒 SISTEMA DE VENDAS & TICKET INDIVIDUAL POR CANAL
@@ -157,6 +159,7 @@ async def fixar_produto(
     await interaction.channel.send(embed=embed, view=ViewBotaoComprar())
     await interaction.followup.send("✅ Anúncio do produto fixado com sucesso neste canal!", ephemeral=True)
 
+
 # =========================================================
 # 🪙 SISTEMA DE GOLDS (ECONOMIA CONECTADA AO economy.py)
 # =========================================================
@@ -186,9 +189,6 @@ async def pay(interaction: discord.Interaction, destino: discord.Member, quantia
     economy.add_gold(destino.id, quantia)
     await interaction.response.send_message(f"💸 **{interaction.user.mention}** enviou **{quantia:,}** Golds 📀 para **{destino.mention}**!")
 
-import os
-import json
-import discord
 
 @bot.tree.command(name="rank", description="🏆 Exibe o TOP 10 dos membros mais ricos do servidor.")
 async def rank(interaction: discord.Interaction):
@@ -223,6 +223,7 @@ async def rank(interaction: discord.Interaction):
 
     except Exception as e:
         await interaction.followup.send(f"❌ Ocorreu um erro ao carregar o rank: `{e}`")
+
 
 # =========================================================
 # 🎮 JOGO DA VELHA
@@ -262,6 +263,7 @@ class TicTacToeButton(discord.ui.Button):
 
         await interaction.response.edit_message(content=content, view=view)
 
+
 class TicTacToeView(discord.ui.View):
     def __init__(self, player_x: discord.Member, player_o: discord.Member):
         super().__init__(timeout=180)
@@ -280,12 +282,14 @@ class TicTacToeView(discord.ui.View):
         if all(cell != 0 for row in self.board for cell in row): return 0
         return None
 
+
 @bot.tree.command(name="velha", description="Desafie um amigo para o Jogo da Velha!")
 async def velha(interaction: discord.Interaction, oponente: discord.Member):
     if oponente.bot or oponente.id == interaction.user.id:
         return await interaction.response.send_message("❌ Oponente inválido!", ephemeral=True)
     view = TicTacToeView(player_x=interaction.user, player_o=oponente)
     await interaction.response.send_message(f"🎮 **Jogo da Velha!**\n{interaction.user.mention} (X) vs {oponente.mention} (O)", view=view)
+
 
 # =========================================================
 # 🔐 SISTEMA DE REGISTRO POR PALAVRA-PASSE
@@ -298,6 +302,7 @@ async def set_chat_filtracao(interaction: discord.Interaction, canal: discord.Te
     save_json(DB_REGISTRO, cfg)
     await interaction.response.send_message(f"✅ Canal de filtração definido para: {canal.mention}")
 
+
 @bot.tree.command(name="set_passe_cargo", description="[ADMIN] Registra palavra-passe para um cargo.")
 @app_commands.checks.has_permissions(administrator=True)
 async def set_passe_cargo(interaction: discord.Interaction, palavra_passe: str, cargo: discord.Role):
@@ -305,6 +310,7 @@ async def set_passe_cargo(interaction: discord.Interaction, palavra_passe: str, 
     cfg["palavras"][palavra_passe.lower()] = cargo.id
     save_json(DB_REGISTRO, cfg)
     await interaction.response.send_message(f"✅ Palavra-passe `{palavra_passe.lower()}` associada ao cargo **{cargo.name}**.")
+
 
 @bot.event
 async def on_member_join(member: discord.Member):
@@ -315,9 +321,11 @@ async def on_member_join(member: discord.Member):
         if canal:
             await canal.send(f"👋 Bem-vindo(a) {member.mention}! Digite a **palavra-passe** de acesso aqui no chat para liberar seu cargo.")
 
+
 @bot.event
 async def on_app_command_completion(interaction: discord.Interaction, command: app_commands.Command):
     print(f"📌 [COMANDO EXECUTADO] /{command.name} por {interaction.user} (ID: {interaction.user.id})", flush=True)
+
 
 @bot.event
 async def on_message(message: discord.Message):
@@ -353,6 +361,7 @@ async def on_message(message: discord.Message):
         except discord.Forbidden:
             pass
 
+
 # ==========================================
 # 🎫 SISTEMA DE TICKETS GENERALIZADO
 # ==========================================
@@ -365,6 +374,7 @@ class BotaoFecharTicket(discord.ui.View):
         await interaction.response.send_message("🔒 Este ticket será apagado em **5 segundos**...", ephemeral=True)
         await asyncio.sleep(5)
         await interaction.channel.delete()
+
 
 class MenuOpcoesTicket(discord.ui.Select):
     def __init__(self):
@@ -409,10 +419,12 @@ class MenuOpcoesTicket(discord.ui.Select):
         await canal_ticket.send(embed=embed_ticket, view=BotaoFecharTicket())
         await interaction.response.send_message(f"✅ Seu ticket foi criado em {canal_ticket.mention}!", ephemeral=True)
 
+
 class PainelTicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(MenuOpcoesTicket())
+
 
 @bot.tree.command(name="painelticket", description="Envia o painel fixo de abertura de tickets no canal")
 @app_commands.checks.has_permissions(administrator=True)
@@ -424,10 +436,11 @@ async def painelticket(interaction: discord.Interaction):
     )
     embed.set_footer(text="Zy-Bot • Sistema de Atendimento Automático")
     await interaction.response.send_message(embed=embed, view=PainelTicketView())
+
+
 # ==========================================================
 # 🏗️ SETUP DO SERVIDOR
 # ==========================================================
-
 @bot.tree.command(name="setup_servidor", description="✨ Cria a estrutura de canais com visual Serif/Bold impecável.")
 @app_commands.checks.has_permissions(administrator=True)
 async def setup_servidor(interaction: discord.Interaction):
@@ -500,21 +513,14 @@ async def setup_servidor(interaction: discord.Interaction):
         await guild.create_text_channel("📡・bot-logs", category=cat_admin)
         await guild.create_text_channel("🛡・staff-only", category=cat_admin)
 
-        await interaction.followup.send("✨ **Servidor gerado com sucesso e visual 100% corrigido!**", ephemeral=True)
-
-    except Exception as e:
-        await interaction.followup.send(f"❌ **Erro no setup:** `{e}`", ephemeral=True)
-
-# ⚔️ 9. RPG YGGDRASIL
+        # ⚔️ 9. RPG YGGDRASIL
         cat_rpg = await guild.create_category("⚔️ 𝑹𝑷𝑮 𝒀𝑮𝑮𝑫𝑑𝑨𝑺𝑰𝑳 ›")
-        
         c_como_jogar = await guild.create_text_channel("📜・como-jogar", category=cat_rpg)
         await guild.create_text_channel("🔥・foguinho-e-cassino", category=cat_rpg)
         await guild.create_text_channel("🐉・masmorras", category=cat_rpg)
         await guild.create_text_channel("🐾・meu-pet", category=cat_rpg)
         await guild.create_text_channel("🏆・ostentacao-rank", category=cat_rpg)
 
-        # Mensagem explicativa no canal de tutorial
         embed_rpg_guia = discord.Embed(
             title="⚔️ 𝑩𝑬𝑴-𝑽𝑰𝑵𝑫𝑶 𝑨𝑶 𝑹𝑷𝑮 𝒀𝑮𝑮𝑫𝑑𝑨𝑺𝑰𝑳",
             description=(
@@ -532,6 +538,12 @@ async def setup_servidor(interaction: discord.Interaction):
         embed_rpg_guia.set_footer(text="Aproveite e boa sorte nas batalhas!")
         await c_como_jogar.send(embed=embed_rpg_guia)
 
+        await interaction.followup.send("✨ **Servidor gerado com sucesso e visual 100% corrigido!**", ephemeral=True)
+
+    except Exception as e:
+        await interaction.followup.send(f"❌ **Erro no setup:** `{e}`", ephemeral=True)
+
+
 # ==========================================
 # ⚔️ SETUP ISOLADO DO RPG YGGDRASIL
 # ==========================================
@@ -542,7 +554,6 @@ async def setup_rpg(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     guild = interaction.guild
 
-    # 🛑 1. Verifica se a categoria já existe para evitar duplicados
     nome_categoria = "⚔️ 𝑹𝑷𝑮 𝒀𝑮𝑮𝑫𝑑𝑨𝑺𝑰𝑳 ›"
     cat_existente = discord.utils.get(guild.categories, name=nome_categoria)
 
@@ -553,16 +564,13 @@ async def setup_rpg(interaction: discord.Interaction):
         )
 
     try:
-        # 🛡️ 2. Cria a categoria e os canais do RPG
         cat_rpg = await guild.create_category(nome_categoria)
-
         c_como_jogar = await guild.create_text_channel("📜・como-jogar", category=cat_rpg)
         await guild.create_text_channel("🔥・foguinho-e-cassino", category=cat_rpg)
         await guild.create_text_channel("🐉・masmorras", category=cat_rpg)
         await guild.create_text_channel("🐾・meu-pet", category=cat_rpg)
         await guild.create_text_channel("🏆・ostentacao-rank", category=cat_rpg)
 
-        # 📜 3. Envia o guia no canal de tutorial
         embed_rpg_guia = discord.Embed(
             title="⚔️ 𝑩𝑬𝑴-𝑽𝑰𝑵𝑫𝑶 𝑨𝑶 𝑹𝑷𝑮 𝒀𝑮𝑮𝑫𝑑𝑨𝑺𝑰𝑳",
             description=(
@@ -585,6 +593,7 @@ async def setup_rpg(interaction: discord.Interaction):
     except Exception as e:
         await interaction.followup.send(f"❌ **Erro ao criar a categoria RPG:** `{e}`", ephemeral=True)
 
+
 # ==========================================
 # 🛠️ UTILITÁRIOS
 # ==========================================
@@ -593,6 +602,7 @@ async def ping(interaction: discord.Interaction):
     await interaction.response.defer()
     ms = round(bot.latency * 1000)
     await interaction.followup.send(f"🏓 Pong! Latência atual: **{ms}ms**")
+
 
 @bot.tree.command(name="userinfo", description="Exibe informações de um membro")
 async def userinfo(interaction: discord.Interaction, membro: discord.Member = None):
@@ -610,6 +620,7 @@ async def userinfo(interaction: discord.Interaction, membro: discord.Member = No
     
     await interaction.followup.send(embed=embed)
 
+
 @bot.tree.command(name="serverinfo", description="Exibe detalhes do servidor")
 async def serverinfo(interaction: discord.Interaction):
     await interaction.response.defer()
@@ -623,10 +634,10 @@ async def serverinfo(interaction: discord.Interaction):
         embed.set_thumbnail(url=guild.icon.url)
     await interaction.followup.send(embed=embed)
 
+
 # ==========================================
 # 📚 MENU DE AJUDA INTERATIVO (SEM IMAGENS)
 # ==========================================
-
 class HelpSelect(discord.ui.Select):
     def __init__(self):
         options = [
@@ -723,10 +734,12 @@ class HelpSelect(discord.ui.Select):
         embed.set_footer(text="Zy-Bot • Selecione qualquer categoria no menu acima para navegar.")
         await interaction.response.edit_message(embed=embed, view=self.view)
 
+
 class HelpView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=180)
         self.add_item(HelpSelect())
+
 
 @bot.tree.command(name="ajuda", description="Central de ajuda interativa do bot")
 async def ajuda(interaction: discord.Interaction):
@@ -743,6 +756,7 @@ async def ajuda(interaction: discord.Interaction):
 
     await interaction.response.send_message(embed=embed, view=HelpView())
 
+
 @bot.tree.command(name="avatar", description="Manda o avatar de um membro")
 async def avatar(interaction: discord.Interaction, membro: discord.Member = None):
     await interaction.response.defer()
@@ -750,6 +764,7 @@ async def avatar(interaction: discord.Interaction, membro: discord.Member = None
     embed = discord.Embed(title=f"🖼️ Avatar de {alvo.name}", color=discord.Color.dark_theme())
     embed.set_image(url=alvo.display_avatar.url)
     await interaction.followup.send(embed=embed)
+
 
 @bot.tree.command(name="embed", description="Cria uma mensagem formatada (Embed)")
 @app_commands.checks.has_permissions(manage_messages=True)
@@ -763,6 +778,7 @@ async def embed(interaction: discord.Interaction, titulo: str, conteudo: str, co
     await interaction.channel.send(embed=embed_msg)
     await interaction.followup.send("✅ Embed enviada!", ephemeral=True)
 
+
 @bot.tree.command(name="enquete", description="Abre uma votação com reações")
 async def enquete(interaction: discord.Interaction, pergunta: str):
     await interaction.response.defer()
@@ -771,6 +787,7 @@ async def enquete(interaction: discord.Interaction, pergunta: str):
     await mensagem.add_reaction("👍")
     await mensagem.add_reaction("👎")
 
+
 @bot.tree.command(name="lembrete", description="Define um lembrete")
 async def lembrete(interaction: discord.Interaction, minutos: int, texto: str):
     await interaction.response.defer()
@@ -778,15 +795,16 @@ async def lembrete(interaction: discord.Interaction, minutos: int, texto: str):
     await asyncio.sleep(minutos * 60)
     await interaction.channel.send(f"🔔 {interaction.user.mention}, **Lembrete:** {texto}")
 
+
 @bot.tree.command(name="moeda", description="Joga cara ou coroa")
 async def moeda(interaction: discord.Interaction):
     await interaction.response.defer()
     await interaction.followup.send(f"🎲 Resultado: **{random.choice(['Cara 🪙', 'Coroa 👑'])}**")
 
+
 # ==========================================
 # 🤖 COMANDOS DE INTELIGÊNCIA ARTIFICIAL
 # ==========================================
-
 @bot.tree.command(name="gemini", description="Pergunte algo para a IA do Google (Gemini).")
 async def gemini_cmd(interaction: discord.Interaction, pergunta: str):
     """Responde dúvidas usando o modelo Gemini 2.5 Flash."""
@@ -851,10 +869,10 @@ async def chatgpt_cmd(interaction: discord.Interaction, pergunta: str):
     except Exception as e:
         await interaction.followup.send(f"❌ Erro ao processar resposta do ChatGPT: `{e}`")
 
+
 # ==========================================
 # 🎨 COMANDOS DE GERENCIAMENTO E DECORAÇÃO DE CANAIS
 # ==========================================
-
 @bot.tree.command(name="criar_canal", description="Cria um novo canal com nome decorado e personalizado.")
 @app_commands.checks.has_permissions(manage_channels=True)
 @app_commands.choices(tipo=[
@@ -927,6 +945,7 @@ async def renomear_canal(
     except Exception as e:
         await interaction.followup.send(f"⚠️ Ocorreu um erro ao renomear: `{e}`", ephemeral=True)
 
+
 # ==========================================
 # 🛡️ MODERAÇÃO E GESTÃO
 # ==========================================
@@ -937,6 +956,7 @@ async def limpar(interaction: discord.Interaction, quantidade: int):
     deleted = await interaction.channel.purge(limit=quantidade)
     await interaction.followup.send(f"🧹 **{len(deleted)}** mensagens apagadas!", ephemeral=True)
 
+
 @bot.tree.command(name="limparuser", description="Apaga mensagens de um usuário específico")
 @app_commands.checks.has_permissions(manage_messages=True)
 async def limparuser(interaction: discord.Interaction, membro: discord.Member, quantidade: int = 20):
@@ -944,12 +964,14 @@ async def limparuser(interaction: discord.Interaction, membro: discord.Member, q
     deleted = await interaction.channel.purge(limit=quantidade, check=lambda m: m.author.id == membro.id)
     await interaction.followup.send(f"🧹 Apagadas **{len(deleted)}** mensagens de {membro.mention}!", ephemeral=True)
 
+
 @bot.tree.command(name="kick", description="Expulsa um membro")
 @app_commands.checks.has_permissions(kick_members=True)
 async def kick(interaction: discord.Interaction, membro: discord.Member, motivo: str = "Não especificado"):
     await interaction.response.defer()
     await membro.kick(reason=motivo)
-    await interaction.followup.send(f"👞 **{membro.mention}** foi expulsos. Motivo: *{motivo}*")
+    await interaction.followup.send(f"👞 **{membro.mention}** foi expulso. Motivo: *{motivo}*")
+
 
 @bot.tree.command(name="ban", description="Bane um membro")
 @app_commands.checks.has_permissions(ban_members=True)
@@ -957,6 +979,7 @@ async def ban(interaction: discord.Interaction, membro: discord.Member, motivo: 
     await interaction.response.defer()
     await membro.ban(reason=motivo)
     await interaction.followup.send(f"🔨 **{membro.mention}** foi banido. Motivo: *{motivo}*")
+
 
 @bot.tree.command(name="mute", description="Silencia um membro temporariamente")
 @app_commands.checks.has_permissions(moderate_members=True)
@@ -966,12 +989,14 @@ async def mute(interaction: discord.Interaction, membro: discord.Member, minutos
     await membro.timeout(tempo, reason=motivo)
     await interaction.followup.send(f"🔇 **{membro.mention}** silenciado por **{minutos}m**.")
 
+
 @bot.tree.command(name="unmute", description="Remove o silêncio de um membro")
 @app_commands.checks.has_permissions(moderate_members=True)
 async def unmute(interaction: discord.Interaction, membro: discord.Member):
     await interaction.response.defer()
     await membro.timeout(None)
     await interaction.followup.send(f"🔊 O silêncio de **{membro.mention}** foi removido!")
+
 
 @bot.tree.command(name="warn", description="Envia uma advertência para um membro")
 @app_commands.checks.has_permissions(moderate_members=True)
@@ -984,12 +1009,14 @@ async def warn(interaction: discord.Interaction, membro: discord.Member, motivo:
         pass
     await interaction.followup.send(f"⚠️ Advertência aplicada a **{membro.mention}**!\n**Motivo:** *{motivo}*")
 
+
 @bot.tree.command(name="addcargo", description="Adiciona um cargo a um membro")
 @app_commands.checks.has_permissions(manage_roles=True)
 async def addcargo(interaction: discord.Interaction, membro: discord.Member, cargo: discord.Role):
     await interaction.response.defer()
     await membro.add_roles(cargo)
     await interaction.followup.send(f"✅ Cargo {cargo.mention} adicionado a **{membro.mention}**!")
+
 
 @bot.tree.command(name="removecargo", description="Remove um cargo de um membro")
 @app_commands.checks.has_permissions(manage_roles=True)
@@ -998,12 +1025,14 @@ async def removecargo(interaction: discord.Interaction, membro: discord.Member, 
     await membro.remove_roles(cargo)
     await interaction.followup.send(f"🗑️ Cargo {cargo.mention} removido de **{membro.mention}**!")
 
+
 @bot.tree.command(name="nick", description="Altera o apelido de um membro")
 @app_commands.checks.has_permissions(manage_nicknames=True)
 async def nick(interaction: discord.Interaction, membro: discord.Member, novo_apelido: str):
     await interaction.response.defer()
     await membro.edit(nick=novo_apelido)
     await interaction.followup.send(f"📝 Apelido de **{membro.mention}** alterado para `{novo_apelido}`!")
+
 
 @bot.tree.command(name="anuncio", description="Envia um anúncio formatado")
 @app_commands.checks.has_permissions(administrator=True)
@@ -1013,6 +1042,7 @@ async def anuncio(interaction: discord.Interaction, canal: discord.TextChannel, 
     await canal.send(embed=embed)
     await interaction.followup.send(f"✅ Anúncio enviado em {canal.mention}!", ephemeral=True)
 
+
 @bot.tree.command(name="lock", description="Tranca o canal atual")
 @app_commands.checks.has_permissions(manage_channels=True)
 async def lock(interaction: discord.Interaction):
@@ -1020,12 +1050,14 @@ async def lock(interaction: discord.Interaction):
     await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=False)
     await interaction.followup.send("🔒 Este canal foi **trancado**.")
 
+
 @bot.tree.command(name="unlock", description="Destranca o canal atual")
 @app_commands.checks.has_permissions(manage_channels=True)
 async def unlock(interaction: discord.Interaction):
     await interaction.response.defer()
     await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=True)
     await interaction.followup.send("🔓 Este canal foi **destrancado**.")
+
 
 @bot.tree.command(name="sorteio", description="Sorteia um membro do servidor")
 @app_commands.checks.has_permissions(administrator=True)
@@ -1036,32 +1068,25 @@ async def sorteio(interaction: discord.Interaction, premio: str):
     embed = discord.Embed(title="🎉 SORTEIO!", description=f"**Prêmio:** {premio}\n🏆 **Vencedor:** {vencedor.mention}", color=discord.Color.gold())
     await interaction.followup.send(embed=embed)
 
-@bot.tree.error
-async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
-    if isinstance(error, app_commands.MissingPermissions):
-        msg = "❌ Você não tem permissão para usar este comando."
-        if not interaction.response.is_done():
-            await interaction.response.send_message(msg, ephemeral=True)
-        else:
-            await interaction.followup.send(msg, ephemeral=True)
 
+# ==========================================
+# ⚙️ TRATAMENTO UNIFICADO DE ERROS (CORRIGIDO)
+# ==========================================
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.CommandOnCooldown):
         minutos = round(error.retry_after / 60)
         msg = f"⏳ Calma aí! Seus personagens estão exaustos. Você poderá batalhar novamente em **{minutos} minutos**."
-        
-        if not interaction.response.is_done():
-            await interaction.response.send_message(msg, ephemeral=True)
-        else:
-            await interaction.followup.send(msg, ephemeral=True)
-            
     elif isinstance(error, app_commands.MissingPermissions):
         msg = "❌ Você não tem permissão para usar este comando."
-        if not interaction.response.is_done():
-            await interaction.response.send_message(msg, ephemeral=True)
-        else:
-            await interaction.followup.send(msg, ephemeral=True)
+    else:
+        msg = f"❌ Ocorreu um erro ao executar este comando: `{error}`"
+
+    if not interaction.response.is_done():
+        await interaction.response.send_message(msg, ephemeral=True)
+    else:
+        await interaction.followup.send(msg, ephemeral=True)
+
 
 # ==========================================
 # 🚀 INICIALIZAÇÃO
@@ -1082,4 +1107,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-        
