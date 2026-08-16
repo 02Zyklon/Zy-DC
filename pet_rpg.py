@@ -1,6 +1,7 @@
 import os
 import json
 import random
+from datetime import datetime
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -95,8 +96,6 @@ CENARIOS_GUILDA = [
 class SafeEconomy:
     @staticmethod
     def add_gold(user_id, amount):
-        # Se houver outro sistema de economia global integrado no seu bot principal, 
-        # substitua a lógica abaixo ou importe o módulo real.
         eco_file = "economy.json"
         data = {}
         if os.path.exists(eco_file):
@@ -441,7 +440,7 @@ class PetRPG(commands.Cog):
 
         await interaction.followup.send(embed=embed)
 
-    # 2. COMANDO: /xplorar
+    # 2. COMANDO: /xplorar (Com Reset Diário Automático por Data)
     @app_commands.command(name="xplorar", description="[GUILDA] Explore ecossistemas para batalhar e subir de nível rápido!")
     async def xplorar(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
@@ -458,6 +457,15 @@ class PetRPG(commands.Cog):
                 f"🔒 **Acesso Negado!** A exploração da guilda é extrema. Seu Pet precisa ser **Nível 15+** (Nível atual: {pet.get('level', 1)}).", 
                 ephemeral=True
             )
+
+        # Lógica de Reset Diário baseada na data atual (YYYY-MM-DD)
+        data_atual = datetime.now().strftime("%Y-%m-%d")
+        ultima_data = pet.get("ultima_exploracao_data", "")
+
+        if ultima_data != data_atual:
+            pet["ultima_exploracao_data"] = data_atual
+            pet["exploracao_hoje"] = 0
+            save_data(pets)
 
         hoje = pet.get("exploracao_hoje", 0)
         if hoje >= 10:
