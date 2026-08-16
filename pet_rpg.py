@@ -221,6 +221,42 @@ class PetRPG(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    @app_commands.command(name="foguinho", description="🔥 Invoca o poder do pet Foguinho/Faisquinha.")
+    async def foguinho(self, interaction: discord.Interaction):
+        # Evita o erro de timeout do Discord enquanto processa os dados
+        await interaction.response.defer()
+
+        user_id = str(interaction.user.id)
+        pets_data = self._load_pets()
+
+        # Verifica se o usuário tem o pet cadastrado
+        if user_id not in pets_data:
+            return await interaction.followup.send("⚠️ Você ainda não possui um pet registrado no sistema!")
+
+        pet = pets_data[user_id]
+
+        embed = discord.Embed(
+            title=f"🔥 Painel do Pet: {pet.get('nome', 'Foguinho')}",
+            description=f"**Raça:** {pet.get('raça', 'Faisquinha')}\n**Elemento:** `{pet.get('elemento', 'fogo')}`",
+            color=discord.Color.orange()
+        )
+        
+        if pet.get('midia'):
+            embed.set_thumbnail(url=pet.get('midia'))
+
+        stats = pet.get("stats", {})
+        embed.add_field(name="⭐ Nível", value=str(pet.get("level", 1)), inline=True)
+        embed.add_field(name="✨ XP", value=str(pet.get("xp", 0)), inline=True)
+        embed.add_field(name="❤️ HP", value=f"{stats.get('hp_atual', 100)}/{stats.get('hp_max', 100)}", inline=True)
+        embed.add_field(name="⚔️ Ataque", value=str(stats.get('atq', 0)), inline=True)
+        embed.add_field(name="🛡️ Defesa", value=str(stats.get('defesa', 0)), inline=True)
+        embed.add_field(name="💨 Agilidade", value=str(stats.get('agi', 0)), inline=True)
+
+        await interaction.followup.send(embed=embed)
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(FoguinhoCog(bot))
+
     # 1. COMANDO: /masmorra
     @app_commands.command(name="masmorra", description="Enfrente monstros em uma masmorra para ganhar XP e Golds!")
     @app_commands.choices(dificuldade=[
