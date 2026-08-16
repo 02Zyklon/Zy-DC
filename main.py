@@ -1092,10 +1092,15 @@ async def main():
             print("❌ ERRO CRÍTICO: DISCORD_TOKEN não encontrado!")
             return
         
-        # Carrega a Cog do RPG dinamicamente
-        await bot.load_extension("pet_rpg")
+        # Carrega a Cog do RPG com proteção contra duplo carregamento
+        try:
+            await bot.load_extension("pet_rpg")
+        except commands.ExtensionAlreadyLoaded:
+            pass
+        except Exception as e:
+            print(f"❌ Erro ao carregar pet_rpg: {e}")
         
         await bot.start(token)
 
 if __name__ == "__main__":
-    
+    asyncio.run(main())
