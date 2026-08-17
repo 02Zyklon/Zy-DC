@@ -14,14 +14,32 @@ DB_RPG = "config_rpg.json"
 CARGO_AVENTUREIRO_ID = 1538666697849045092
 CANAL_ESPECIFICO_ID = 1538229136898662500
 
+# Tabela Padrão de Ranks com Cores Customizadas
+RANKS_PADRAO = {
+    "Rank F": {"nivel_req": 20, "cor": "#CD7F32", "cargo_id": None},   # Bronze
+    "Rank E": {"nivel_req": 35, "cor": "#A0522D", "cargo_id": None},   # Bronze
+    "Rank D": {"nivel_req": 50, "cor": "#C0C0C0", "cargo_id": None},   # Prata
+    "Rank C": {"nivel_req": 65, "cor": "#E6E8FA", "cargo_id": None},   # Prata
+    "Rank B": {"nivel_req": 80, "cor": "#FFD700", "cargo_id": None},   # Ouro
+    "Rank A": {"nivel_req": 100, "cor": "#FFA500", "cargo_id": None},  # Ouro
+    "Rank S": {"nivel_req": 130, "cor": "#9400D3", "cargo_id": None},  # Roxo Único
+    "Rank SS": {"nivel_req": 160, "cor": "#FF007F", "cargo_id": None}  # Rosa Neon Único
+}
+
 def load_rpg_db():
+    default_data = {
+        "pets": {},
+        "masmorras": {},
+        "boss_atual": {"nome": "Zé pilintra", "vida": 699903, "vida_max": 700000, "nivel": 1},
+        "ranks_aventureiro": RANKS_PADRAO
+    }
     if not os.path.exists(DB_RPG):
-        return {"pets": {}, "masmorras": {}, "boss_atual": {"nome": "Zé pilintra", "vida": 699903, "vida_max": 700000, "nivel": 1}}
+        return default_data
     try:
         with open(DB_RPG, "r", encoding="utf-8") as f:
             conteudo = f.read().strip()
             if not conteudo:
-                return {"pets": {}, "masmorras": {}, "boss_atual": {"nome": "Zé pilintra", "vida": 699903, "vida_max": 700000, "nivel": 1}}
+                return default_data
             data = json.loads(conteudo)
             if "pets" not in data:
                 data["pets"] = {}
@@ -29,13 +47,51 @@ def load_rpg_db():
                 data["masmorras"] = {}
             if "boss_atual" not in data:
                 data["boss_atual"] = {"nome": "Zé pilintra", "vida": 699903, "vida_max": 700000, "nivel": 1}
+            if "ranks_aventureiro" not in data:
+                data["ranks_aventureiro"] = RANKS_PADRAO
             return data
     except Exception:
-        return {"pets": {}, "masmorras": {}, "boss_atual": {"nome": "Zé pilintra", "vida": 699903, "vida_max": 700000, "nivel": 1}}
+        return default_data
 
 def save_rpg_db(data):
     with open(DB_RPG, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
+
+async def checar_promocao_rank(member: discord.Member, nivel_pet: int, db: dict):
+    """Verifica e atualiza o cargo de Rank de Aventureiro do jogador de acordo com o nível do pet."""
+    ranks = db.get("ranks_aventureiro", {})
+    if not ranks or not member or not member.guild:
+        return None
+
+    rank_alcancado_nome = None
+    rank_alcancado_info = None
+
+    # Encontra o maior rank elegível para o nível do pet
+    for nome_rank, info in ranks.items():
+        if nivel_pet >= info.get("nivel_req", 999):
+            rank_alcancado_nome = nome_rank
+            rank_alcancado_info = info
+
+    if not rank_alcancado_info or not rank_alcancado_info.get("cargo_id"):
+        return None
+
+    cargo_novo = member.guild.get_role(rank_alcancado_info["cargo_id"])
+    if not cargo_novo or cargo_novo in member.roles:
+        return None  # Já está com o cargo atualizado
+
+    # Coleta todos os IDs de cargos de rank cadastrados para remover os antigos do usuário
+    todos_cargos_ids = [info["cargo_id"] for info in ranks.values() if info.get("cargo_id")]
+    cargos_para_remover = [role for role in member.roles if role.id in todos_cargos_ids]
+
+    try:
+        if cargos_para_remover:
+            await member.remove_roles(*cargos_para_remover)
+        await member.add_roles(cargo_novo)
+        return (rank_alcancado_nome, cargo_novo)
+    except Exception as e:
+        print(f"Erro ao atribuir rank para {member.display_name}: {e}")
+        return None
+
 
 class AventureiroConfirmView(discord.ui.View):
     def __init__(self, cargo_aventureiro_id: int, canal_liberar_id: int):
@@ -83,6 +139,55 @@ class AventureiroConfirmView(discord.ui.View):
 class PetRPG(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
+    @app_commands.command(name="setup_ranks", description="[Admin] Cria os cargos de Rank de Aventureiro no Discord e salva no config_rpg.json.")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def setup_ranks(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        db = load_rpg_db()
+        guild = interaction.guild
+
+        if "ranks_aventureiro" not in db or not db["ranks_aventureiro"]:
+            db["ranks_aventureiro"] = RANKS_PADRAO
+
+        relatorio = []
+
+        for nome_rank, info in db["ranks_aventureiro"].items():
+            cor_hex = info.get("cor", "#999999").lstrip("#")
+            cor_obj = discord.Color(int(cor_hex, 16))
+
+            cargo_existente = None
+            if info.get("cargo_id"):
+                cargo_existente = guild.get_role(info["cargo_id"])
+
+            if not cargo_existente:
+                cargo_existente = discord.utils.get(guild.roles, name=nome_rank)
+
+            if not cargo_existente:
+                try:
+                    novo_cargo = await guild.create_role(
+                        name=nome_rank,
+                        color=cor_obj,
+                        reason="Setup de Ranks da Guilda de Aventureiros"
+                    )
+                    info["cargo_id"] = novo_cargo.id
+                    relatorio.append(f"✨ **{nome_rank}** — Criado com sucesso!")
+                except discord.Forbidden:
+                    return await interaction.followup.send("❌ Permissão insuficiente! Verifique se o bot tem 'Gerenciar Cargos'.", ephemeral=True)
+            else:
+                info["cargo_id"] = cargo_existente.id
+                relatorio.append(f"🔹 **{nome_rank}** — Já existia no servidor (Vincular ID).")
+
+        save_rpg_db(db)
+
+        embed = discord.Embed(
+            title="⚔️ Cargos de Rank da Guilda Configurados!",
+            description="\n".join(relatorio),
+            color=discord.Color.gold()
+        )
+        embed.set_footer(text="Estrutura de Ranks salva em config_rpg.json")
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="daily", description="Coleta sua recompensa diária de Golds.")
     @app_commands.checks.cooldown(1, 86400, key=lambda i: i.user.id) # 24 horas de cooldown
@@ -152,7 +257,6 @@ class PetRPG(commands.Cog):
             color=discord.Color.green()
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
-
 
     @app_commands.command(name="pet_perfil", description="Exibe os status, vida e vitórias do seu Pet.")
     async def pet_perfil(self, interaction: discord.Interaction):
@@ -347,7 +451,7 @@ class PetRPG(commands.Cog):
             db["pets"][user_id]["vitorias"] = db["pets"][user_id].get("vitorias", 0) + 1
             db["pets"][user_id]["xp"] = db["pets"][user_id].get("xp", 0) + 35
 
-            # Subir de nível simples
+            # Subir de nível
             lvl_up_txt = ""
             if db["pets"][user_id]["xp"] >= 150:
                 db["pets"][user_id]["nivel"] = db["pets"][user_id].get("nivel", 1) + 1
@@ -356,11 +460,20 @@ class PetRPG(commands.Cog):
 
             save_rpg_db(db)
 
+            # Verifica se o membro foi promovido de Rank de Aventureiro
+            promocao = await checar_promocao_rank(interaction.user, db["pets"][user_id]["nivel"], db)
+
             embed = discord.Embed(
                 title="⚔️ Vitória na Masmorra!",
                 description=f"Seu pet derrotou um **{monstro_escolhido}**!\n\n💰 Recompensa: **{recompensa_gold} Golds**{lvl_up_txt}",
                 color=discord.Color.green()
             )
+            if promocao:
+                embed.add_field(
+                    name="🎖️ NOVA PROMOÇÃO DE RANK!",
+                    value=f"Parabéns! Você alcançou o **{promocao[0]}** na Guilda e recebeu o cargo {promocao[1].mention}!",
+                    inline=False
+                )
         else:
             embed = discord.Embed(
                 title="💀 Derrota na Masmorra...",
@@ -515,6 +628,8 @@ class PetRPG(commands.Cog):
         info = dados_bioma[bioma.value]
         evento_perigo = random.random() < info["chance_perigo"]
 
+        promocao = None
+
         if evento_perigo:
             monstro = random.choice(info["mobs"])
             chance_vitoria = min(0.35 + (pet.get("nivel", 1) * 0.02), 0.75)  
@@ -536,6 +651,9 @@ class PetRPG(commands.Cog):
                     pet["vida"] = 100
 
                 save_rpg_db(db)
+
+                # Verifica se o membro foi promovido de Rank de Aventureiro
+                promocao = await checar_promocao_rank(interaction.user, pet["nivel"], db)
 
                 embed = discord.Embed(
                     title=f"⚔️ Vitória Difícil em {info['nome']}!",
@@ -579,6 +697,13 @@ class PetRPG(commands.Cog):
                     f"✨ **Experiência:** `+10 XP`"
                 ),
                 color=info["cor"]
+            )
+
+        if promocao:
+            embed.add_field(
+                name="🎖️ NOVA PROMOÇÃO DE RANK!",
+                value=f"Parabéns! O seu pet atingiu o nível necessário e você subiu para o **{promocao[0]}** ({promocao[1].mention})!",
+                inline=False
             )
 
         if pet.get("nivel", 1) >= 20 and not pet.get("convite_enviado", False):
