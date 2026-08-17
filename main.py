@@ -298,6 +298,26 @@ async def rank(interaction: discord.Interaction):
 # =========================================================
 # 🎮 JOGO DA VELHA
 # =========================================================
+
+@app_commands.command(name="velha", description="Desafie outro membro do servidor para um Jogo da Velha!")
+@app_commands.describe(oponente="Membro que você deseja desafiar")
+async def velha(interaction: discord.Interaction, oponente: discord.Member):
+    if oponente.bot:
+        return await interaction.response.send_message("❌ Você não pode jogar contra um bot!", ephemeral=True)
+
+    if oponente == interaction.user:
+        return await interaction.response.send_message("❌ Você não pode jogar contra si mesmo!", ephemeral=True)
+
+    view = TicTacToeView(p1=interaction.user, p2=oponente)
+    
+    embed = discord.Embed(
+        title="❌ Jogo da Velha ⭕",
+        description=f"🎮 **Partida:** {interaction.user.mention} (❌) vs {oponente.mention} (⭕)\n👉 **Vez de:** {interaction.user.mention} (❌)",
+        color=discord.Color.blue()
+    )
+    
+    await interaction.response.send_message(content=f"{oponente.mention}", embed=embed, view=view)
+    
 class TicTacToeButton(discord.ui.Button):
     def __init__(self, x: int, y: int):
         super().__init__(
@@ -412,28 +432,6 @@ class TicTacToeView(discord.ui.View):
             if " " in row:
                 return False
         return True
-
-
-# Comando para registrar no seu Cog ou bot:
-@app_commands.command(name="velha", description="Desafie outro membro do servidor para um Jogo da Velha!")
-@app_commands.describe(oponente="Membro que você deseja desafiar")
-async def velha(interaction: discord.Interaction, oponente: discord.Member):
-    if oponente.bot:
-        return await interaction.response.send_message("❌ Você não pode jogar contra um bot!", ephemeral=True)
-
-    if oponente == interaction.user:
-        return await interaction.response.send_message("❌ Você não pode jogar contra si mesmo!", ephemeral=True)
-
-    view = TicTacToeView(p1=interaction.user, p2=oponente)
-    
-    embed = discord.Embed(
-        title="❌ Jogo da Velha ⭕",
-        description=f"🎮 **Partida:** {interaction.user.mention} (❌) vs {oponente.mention} (⭕)\n👉 **Vez de:** {interaction.user.mention} (❌)",
-        color=discord.Color.blue()
-    )
-    
-    await interaction.response.send_message(content=f"{oponente.mention}", embed=embed, view=view)
-
 
 # =========================================================
 # 🔐 SISTEMA DE REGISTRO POR PALAVRA-PASSE
