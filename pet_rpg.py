@@ -16,13 +16,26 @@ CANAL_ESPECIFICO_ID = 1538229136898662500
 
 def load_rpg_db():
     if not os.path.exists(DB_RPG):
-        return {"pets": {}, "masmorras": {}}
-    with open(DB_RPG, "r", encoding="utf-8") as f:
-        return json.load(f)
+        return {"pets": {}, "masmorras": {}, "boss_atual": {"nome": "Zé pilintra", "vida": 699903, "vida_max": 700000, "nivel": 1}}
+    try:
+        with open(DB_RPG, "r", encoding="utf-8") as f:
+            conteudo = f.read().strip()
+            if not conteudo:
+                return {"pets": {}, "masmorras": {}, "boss_atual": {"nome": "Zé pilintra", "vida": 699903, "vida_max": 700000, "nivel": 1}}
+            data = json.loads(conteudo)
+            if "pets" not in data:
+                data["pets"] = {}
+            if "masmorras" not in data:
+                data["masmorras"] = {}
+            if "boss_atual" not in data:
+                data["boss_atual"] = {"nome": "Zé pilintra", "vida": 699903, "vida_max": 700000, "nivel": 1}
+            return data
+    except Exception:
+        return {"pets": {}, "masmorras": {}, "boss_atual": {"nome": "Zé pilintra", "vida": 699903, "vida_max": 700000, "nivel": 1}}
 
 def save_rpg_db(data):
     with open(DB_RPG, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 class AventureiroConfirmView(discord.ui.View):
     def __init__(self, cargo_aventureiro_id: int, canal_liberar_id: int):
@@ -122,7 +135,14 @@ class PetRPG(commands.Cog):
             "vida": 100,
             "vitorias": 0,
             "convite_enviado": False,
-            "inventario": {"cura": 0, "racao": 0, "elixir": 0, "amuleto": 0}
+            "inventario": {"cura": 0, "racao": 0, "elixir": 0, "amuleto": 0},
+            "stats": {
+                "hp_atual": 100,
+                "hp_max": 100,
+                "atq": 25,
+                "defesa": 10,
+                "agi": 10
+            }
         }
         save_rpg_db(db)
 
@@ -145,15 +165,19 @@ class PetRPG(commands.Cog):
             return await interaction.followup.send("⚠️ Você ainda não tem um pet! Use `/pet_adotar` primeiro.")
 
         pet = db["pets"][user_id]
+        stats = pet.get("stats", {"hp_atual": pet.get("vida", 100), "hp_max": pet.get("vida", 100), "atq": 25, "defesa": 10, "agi": 10})
+        
         embed = discord.Embed(
-            title=f"🐾 Perfil do Pet — {pet['nome']}",
+            title=f"🐾 Perfil do Pet — {pet.get('nome', 'Pet')}",
             description=f"Dono: {interaction.user.mention}",
             color=discord.Color.purple()
         )
-        embed.add_field(name="Elemento", value=pet["elemento"].capitalize(), inline=True)
-        embed.add_field(name="Nível", value=f"`{pet['nivel']}`", inline=True)
-        embed.add_field(name="XP", value=f"`{pet['xp']}/150`", inline=True)
-        embed.add_field(name="Vida", value=f"`{pet.get('vida', 100)} HP`", inline=True)
+        embed.add_field(name="Elemento", value=pet.get("elemento", "neutro").capitalize(), inline=True)
+        embed.add_field(name="Nível", value=f"`{pet.get('nivel', 1)}`", inline=True)
+        embed.add_field(name="XP", value=f"`{pet.get('xp', 0)}/150`", inline=True)
+        embed.add_field(name="Vida (HP)", value=f"`{stats.get('hp_atual', 100)} / {stats.get('hp_max', 100)}`", inline=True)
+        embed.add_field(name="Ataque", value=f"`{stats.get('atq', 25)}`", inline=True)
+        embed.add_field(name="Defesa", value=f"`{stats.get('defesa', 10)}`", inline=True)
         embed.add_field(name="Vitórias", value=f"`{pet.get('vitorias', 0)}`", inline=True)
 
         await interaction.followup.send(embed=embed)
@@ -320,16 +344,15 @@ class PetRPG(commands.Cog):
         if vitoria:
             recompensa_gold = random.randint(50, 200)
             economy.add_gold(interaction.user.id, recompensa_gold)
-            db["pets"][user_id]["vitorias"] += 1
-            db["pets"][user_id]["xp"] += 35
+            db["pets"][user_id]["vitorias"] = db["pets"][user_id].get("vitorias", 0) + 1
+            db["pets"][user_id]["xp"] = db["pets"][user_id].get("xp", 0) + 35
 
             # Subir de nível simples
+            lvl_up_txt = ""
             if db["pets"][user_id]["xp"] >= 150:
-                db["pets"][user_id]["nivel"] += 1
-                db["pets"][user_id]["xp"] = 0
+                db["pets"][user_id]["nivel"] = db["pets"][user_id].get("nivel", 1) + 1
+                db["pets"][user_id]["xp"] -= 150
                 lvl_up_txt = "\n🎉 **Seu pet subiu de nível!**"
-            else:
-                lvl_up_txt = ""
 
             save_rpg_db(db)
 
@@ -358,13 +381,11 @@ class PetRPG(commands.Cog):
         if user_id not in db["pets"]:
             return await interaction.followup.send("⚠️ Você precisa adotar um pet primeiro para enfrentar o Boss! Use `/pet_adotar`.", ephemeral=True)
 
-        # Verifica se há um boss ativo na database do RPG (ou define um padrão caso não exista)
-        boss_data = db.get("boss_atual", {"nome": "Dragão das Sombras", "vida": 1000, "vida_max": 1000, "nivel": 5})
+        boss_data = db.get("boss_atual", {"nome": "Zé pilintra", "vida": 699903, "vida_max": 700000, "nivel": 1})
         
         if boss_data["vida"] <= 0:
             return await interaction.followup.send("🏆 O Boss atual já foi derrotado! Aguarde um administrador invocar o próximo com `/set_boss`.", ephemeral=True)
 
-        # Mecânica de dano baseada na sorte e pet
         dano_causado = random.randint(50, 150)
         boss_data["vida"] -= dano_causado
         if boss_data["vida"] < 0:
@@ -437,7 +458,6 @@ class PetRPG(commands.Cog):
 
         pet = db["pets"][user_id]
 
-        # 🔒 Trava estrita de Nível 20
         if pet.get("nivel", 1) < 20:
             return await interaction.followup.send(
                 f"❌ **Acesso Negado!** O seu pet está no **Nível {pet.get('nivel', 1)}**.\n"
@@ -445,11 +465,10 @@ class PetRPG(commands.Cog):
                 ephemeral=True
             )
 
-        # 🛑 Verifica vida crítica
-        if pet.get("vida", 100) <= 0:
+        vida_atual = pet.get("vida", pet.get("stats", {}).get("hp_atual", 100))
+        if vida_atual <= 0:
             return await interaction.followup.send("💀 O seu pet está esgotado e sem vida! Cure-o antes de voltar a explorar.", ephemeral=True)
         
-        # 40 Monstros distribuídos em 4 biomas com alta dificuldade
         dados_bioma = {
             "floresta": {
                 "nome": "🌲 Floresta Sombria",
@@ -498,13 +517,11 @@ class PetRPG(commands.Cog):
 
         if evento_perigo:
             monstro = random.choice(info["mobs"])
-            
-            # Fórmula de vitória equilibrada e desafiadora
-            chance_vitoria = min(0.35 + (pet["nivel"] * 0.02), 0.75)  
+            chance_vitoria = min(0.35 + (pet.get("nivel", 1) * 0.02), 0.75)  
             vitoria = random.random() < chance_vitoria
 
             if vitoria:
-                ouro_ganho = random.randint(15 * pet["nivel"], 40 * pet["nivel"])
+                ouro_ganho = random.randint(15 * pet.get("nivel", 1), 40 * pet.get("nivel", 1))
                 xp_ganho = random.randint(15, 35)
                 economy.add_gold(interaction.user.id, ouro_ganho)
                 
@@ -513,7 +530,7 @@ class PetRPG(commands.Cog):
                 
                 lvl_up = False
                 if pet["xp"] >= 150:
-                    pet["nivel"] += 1
+                    pet["nivel"] = pet.get("nivel", 1) + 1
                     pet["xp"] -= 150
                     lvl_up = True
                     pet["vida"] = 100
@@ -532,7 +549,10 @@ class PetRPG(commands.Cog):
                 )
             else:
                 dano_sofrido = random.randint(35, 65)
-                pet["vida"] = max(0, pet.get("vida", 100) - dano_sofrido)
+                nova_vida = max(0, vida_atual - dano_sofrido)
+                pet["vida"] = nova_vida
+                if "stats" in pet:
+                    pet["stats"]["hp_atual"] = nova_vida
                 save_rpg_db(db)
 
                 embed = discord.Embed(
@@ -540,7 +560,7 @@ class PetRPG(commands.Cog):
                     description=(
                         f"O **{monstro}** era impiedoso! Seu pet foi massacrado na batalha e teve que fugir para sobreviver.\n\n"
                         f"💔 **Dano Sofrido:** `-{dano_sofrido} HP`\n"
-                        f"❤️ **Vida Atual do Pet:** `{pet['vida']}/100 HP`"
+                        f"❤️ **Vida Atual do Pet:** `{nova_vida}/100 HP`"
                     ),
                     color=discord.Color.red()
                 )
@@ -560,8 +580,8 @@ class PetRPG(commands.Cog):
                 ),
                 color=info["cor"]
             )
-# 🌟 Checagem automática para o cargo de Aventureiro ao atingir o Nível 20
-        if pet["nivel"] >= 20 and not pet.get("convite_enviado", False):
+
+        if pet.get("nivel", 1) >= 20 and not pet.get("convite_enviado", False):
             pet["convite_enviado"] = True
             save_rpg_db(db)
 
@@ -575,7 +595,6 @@ class PetRPG(commands.Cog):
             )
             view = AventureiroConfirmView(CARGO_AVENTUREIRO_ID, CANAL_ESPECIFICO_ID)
             
-            # ID exato do canal onde o aviso deve ser enviado
             ID_CANAL_AVISO = 1537883858467430552
             canal_aviso = interaction.guild.get_channel(ID_CANAL_AVISO)
 
@@ -584,7 +603,7 @@ class PetRPG(commands.Cog):
             else:
                 await interaction.followup.send(f"{interaction.user.mention}", embed=convite_embed, view=view, ephemeral=False)
 
-        embed.set_footer(text=f"Explorador: {interaction.user.display_name} • 🐾 Pet: {pet['nome']} (Nv. {pet['nivel']})")
+        embed.set_footer(text=f"Explorador: {interaction.user.display_name} • 🐾 Pet: {pet.get('nome', 'Pet')} (Nv. {pet.get('nivel', 1)})")
         await interaction.followup.send(embed=embed)
 
 async def setup(bot):
