@@ -14,16 +14,16 @@ DB_RPG = "config_rpg.json"
 CARGO_AVENTUREIRO_ID = 1538666697849045092
 CANAL_ESPECIFICO_ID = 1538229136898662500
 
-# Tabela Padrão de Ranks com Cores Customizadas
+# Tabela Padrão de Ranks com Cores e Benefícios (Bônus de Gold e Desconto na Loja)
 RANKS_PADRAO = {
-    "Rank F": {"nivel_req": 20, "cor": "#CD7F32", "cargo_id": None},   # Bronze
-    "Rank E": {"nivel_req": 35, "cor": "#A0522D", "cargo_id": None},   # Bronze
-    "Rank D": {"nivel_req": 50, "cor": "#C0C0C0", "cargo_id": None},   # Prata
-    "Rank C": {"nivel_req": 65, "cor": "#E6E8FA", "cargo_id": None},   # Prata
-    "Rank B": {"nivel_req": 80, "cor": "#FFD700", "cargo_id": None},   # Ouro
-    "Rank A": {"nivel_req": 100, "cor": "#FFA500", "cargo_id": None},  # Ouro
-    "Rank S": {"nivel_req": 130, "cor": "#9400D3", "cargo_id": None},  # Roxo Único
-    "Rank SS": {"nivel_req": 160, "cor": "#FF007F", "cargo_id": None}  # Rosa Neon Único
+    "Rank F": {"nivel_req": 20, "cor": "#CD7F32", "cargo_id": None, "bonus_gold": 1.05, "desconto": 0.0, "cd_explorar": 60},   # +5% Gold
+    "Rank E": {"nivel_req": 35, "cor": "#A0522D", "cargo_id": None, "bonus_gold": 1.10, "desconto": 0.05, "cd_explorar": 55},  # +10% Gold, 5% Off
+    "Rank D": {"nivel_req": 50, "cor": "#C0C0C0", "cargo_id": None, "bonus_gold": 1.15, "desconto": 0.10, "cd_explorar": 50},  # +15% Gold, 10% Off
+    "Rank C": {"nivel_req": 65, "cor": "#E6E8FA", "cargo_id": None, "bonus_gold": 1.20, "desconto": 0.15, "cd_explorar": 45},  # +20% Gold, 15% Off
+    "Rank B": {"nivel_req": 80, "cor": "#FFD700", "cargo_id": None, "bonus_gold": 1.25, "desconto": 0.20, "cd_explorar": 40},  # +25% Gold, 20% Off
+    "Rank A": {"nivel_req": 100, "cor": "#FFA500", "cargo_id": None, "bonus_gold": 1.30, "desconto": 0.25, "cd_explorar": 35}, # +30% Gold, 25% Off
+    "Rank S": {"nivel_req": 130, "cor": "#9400D3", "cargo_id": None, "bonus_gold": 1.40, "desconto": 0.30, "cd_explorar": 30}, # +40% Gold, 30% Off
+    "Rank SS": {"nivel_req": 160, "cor": "#FF007F", "cargo_id": None, "bonus_gold": 1.50, "desconto": 0.35, "cd_explorar": 25} # +50% Gold, 35% Off
 }
 
 def load_rpg_db():
@@ -57,6 +57,22 @@ def save_rpg_db(data):
     with open(DB_RPG, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
+def obter_beneficios_pet(nivel_pet: int, db: dict):
+    """Calcula e retorna os bônus ativos de acordo com o nível do pet e o Rank alcançado."""
+    ranks = db.get("ranks_aventureiro", {})
+    beneficios = {"bonus_gold": 1.0, "desconto": 0.0, "cd_explorar": 60, "rank_nome": "Iniciante"}
+
+    for nome_rank, info in ranks.items():
+        if nivel_pet >= info.get("nivel_req", 999):
+            beneficios = {
+                "bonus_gold": info.get("bonus_gold", 1.0),
+                "desconto": info.get("desconto", 0.0),
+                "cd_explorar": info.get("cd_explorar", 60),
+                "rank_nome": nome_rank
+            }
+
+    return beneficios
+
 async def checar_promocao_rank(member: discord.Member, nivel_pet: int, db: dict):
     """Verifica e atualiza o cargo de Rank de Aventureiro do jogador de acordo com o nível do pet."""
     ranks = db.get("ranks_aventureiro", {})
@@ -66,7 +82,6 @@ async def checar_promocao_rank(member: discord.Member, nivel_pet: int, db: dict)
     rank_alcancado_nome = None
     rank_alcancado_info = None
 
-    # Encontra o maior rank elegível para o nível do pet
     for nome_rank, info in ranks.items():
         if nivel_pet >= info.get("nivel_req", 999):
             rank_alcancado_nome = nome_rank
@@ -77,9 +92,8 @@ async def checar_promocao_rank(member: discord.Member, nivel_pet: int, db: dict)
 
     cargo_novo = member.guild.get_role(rank_alcancado_info["cargo_id"])
     if not cargo_novo or cargo_novo in member.roles:
-        return None  # Já está com o cargo atualizado
+        return None
 
-    # Coleta todos os IDs de cargos de rank cadastrados para remover os antigos do usuário
     todos_cargos_ids = [info["cargo_id"] for info in ranks.values() if info.get("cargo_id")]
     cargos_para_remover = [role for role in member.roles if role.id in todos_cargos_ids]
 
@@ -95,7 +109,7 @@ async def checar_promocao_rank(member: discord.Member, nivel_pet: int, db: dict)
 
 class AventureiroConfirmView(discord.ui.View):
     def __init__(self, cargo_aventureiro_id: int, canal_liberar_id: int):
-        super().__init__(timeout=180) # Expira em 3 minutos
+        super().__init__(timeout=180)
         self.cargo_aventureiro_id = cargo_aventureiro_id
         self.canal_liberar_id = canal_liberar_id
 
@@ -111,10 +125,8 @@ class AventureiroConfirmView(discord.ui.View):
         if not cargo:
             return await interaction.response.send_message("❌ Erro interno: O cargo de aventureiro não foi encontrado pelo ID.", ephemeral=True)
 
-        # Adiciona o cargo ao usuário
         await interaction.user.add_roles(cargo)
 
-        # Configura permissão para ver e enviar mensagens no canal específico
         if canal:
             await canal.set_permissions(interaction.user, view_channel=True, send_messages=True)
 
@@ -186,11 +198,11 @@ class PetRPG(commands.Cog):
             description="\n".join(relatorio),
             color=discord.Color.gold()
         )
-        embed.set_footer(text="Estrutura de Ranks salva em config_rpg.json")
+        embed.set_footer(text="Estrutura de Ranks e Bônus salva em config_rpg.json")
         await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="daily", description="Coleta sua recompensa diária de Golds.")
-    @app_commands.checks.cooldown(1, 86400, key=lambda i: i.user.id) # 24 horas de cooldown
+    @app_commands.checks.cooldown(1, 86400, key=lambda i: i.user.id)
     async def daily(self, interaction: discord.Interaction):
         await interaction.response.defer()
 
@@ -270,10 +282,11 @@ class PetRPG(commands.Cog):
 
         pet = db["pets"][user_id]
         stats = pet.get("stats", {"hp_atual": pet.get("vida", 100), "hp_max": pet.get("vida", 100), "atq": 25, "defesa": 10, "agi": 10})
-        
+        beneficios = obter_beneficios_pet(pet.get("nivel", 1), db)
+
         embed = discord.Embed(
             title=f"🐾 Perfil do Pet — {pet.get('nome', 'Pet')}",
-            description=f"Dono: {interaction.user.mention}",
+            description=f"Dono: {interaction.user.mention}\n🎖️ **Rank de Aventureiro:** `{beneficios['rank_nome']}`",
             color=discord.Color.purple()
         )
         embed.add_field(name="Elemento", value=pet.get("elemento", "neutro").capitalize(), inline=True)
@@ -283,6 +296,10 @@ class PetRPG(commands.Cog):
         embed.add_field(name="Ataque", value=f"`{stats.get('atq', 25)}`", inline=True)
         embed.add_field(name="Defesa", value=f"`{stats.get('defesa', 10)}`", inline=True)
         embed.add_field(name="Vitórias", value=f"`{pet.get('vitorias', 0)}`", inline=True)
+        
+        b_gold = int((beneficios['bonus_gold'] - 1.0) * 100)
+        b_desc = int(beneficios['desconto'] * 100)
+        embed.add_field(name="Bônus de Rank", value=f"🪙 `+{b_gold}% Gold` | 🛒 `{b_desc}% Off na Loja`", inline=False)
 
         await interaction.followup.send(embed=embed)
 
@@ -317,7 +334,7 @@ class PetRPG(commands.Cog):
         embed.set_footer(text="Use os itens estrategicamente antes de explorar ou entrar nas masmorras!")
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="loja", description="Adquira itens especiais para guardar na mochila usando seus Golds.")
+    @app_commands.command(name="loja", description="Adquira itens especiais com descontos exclusivos do seu Rank.")
     @app_commands.choices(item=[
         app_commands.Choice(name="🧪 Poção de Cura (129 Golds)", value="cura"),
         app_commands.Choice(name="🍖 Super Ração (175 Golds)", value="racao"),
@@ -334,6 +351,7 @@ class PetRPG(commands.Cog):
             return await interaction.followup.send("⚠️ Você precisa adotar um pet primeiro para comprar itens! Use `/pet_adotar`.", ephemeral=True)
 
         pet = db["pets"][user_id]
+        beneficios = obter_beneficios_pet(pet.get("nivel", 1), db)
 
         precos = {
             "cura": 129,
@@ -342,12 +360,15 @@ class PetRPG(commands.Cog):
             "amuleto": 348
         }
 
-        custo = precos[item.value]
+        custo_base = precos[item.value]
+        desconto = beneficios["desconto"]
+        custo = int(custo_base * (1.0 - desconto))
+
         saldo_atual = economy.get_gold(interaction.user.id)
 
         if saldo_atual < custo:
             return await interaction.followup.send(
-                f"❌ **Saldo Insuficiente!** Você tem `{saldo_atual:,} Golds`, mas este item custa `{custo:,} Golds`.",
+                f"❌ **Saldo Insuficiente!** Você tem `{saldo_atual:,} Golds`, mas este item custa `{custo:,} Golds` (com desconto de Rank).",
                 ephemeral=True
             )
 
@@ -360,16 +381,17 @@ class PetRPG(commands.Cog):
         pet["inventario"][item.value] = pet["inventario"].get(item.value, 0) + 1
         save_rpg_db(db)
 
+        txt_desconto = f" *(Desconto de {int(desconto*100)}% aplicado pelo {beneficios['rank_nome']})*" if desconto > 0 else ""
+
         embed = discord.Embed(
             title="🛒 Compra Realizada com Sucesso!",
-            description=f"Você adquiriu **{item.name}** por **{custo} Golds**.\nO item foi guardado com segurança na sua mochila (`/inventario`).",
+            description=f"Você adquiriu **{item.name}** por **{custo:,} Golds**{txt_desconto}.\nO item foi guardado na sua mochila (`/inventario`).",
             color=discord.Color.green()
         )
         embed.set_footer(text=f"Saldo restante: {economy.get_gold(interaction.user.id):,} Golds")
         
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-        # Log automático para a staff em itens de alto valor
         if custo >= 250:
             try:
                 log_channel = discord.utils.get(interaction.guild.text_channels, name="📡・bot-logs")
@@ -431,7 +453,7 @@ class PetRPG(commands.Cog):
         await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="masmorra", description="Enfrente monstros nas profundezas de Yggdrasil por recompensas.")
-    @app_commands.checks.cooldown(1, 300, key=lambda i: i.user.id) # 5 minutos de cooldown
+    @app_commands.checks.cooldown(1, 300, key=lambda i: i.user.id)
     async def masmorra(self, interaction: discord.Interaction):
         await interaction.response.defer()
 
@@ -446,12 +468,14 @@ class PetRPG(commands.Cog):
         vitoria = random.choice([True, False])
 
         if vitoria:
-            recompensa_gold = random.randint(50, 200)
+            beneficios = obter_beneficios_pet(db["pets"][user_id].get("nivel", 1), db)
+            recompensa_base = random.randint(50, 200)
+            recompensa_gold = int(recompensa_base * beneficios["bonus_gold"])
+            
             economy.add_gold(interaction.user.id, recompensa_gold)
             db["pets"][user_id]["vitorias"] = db["pets"][user_id].get("vitorias", 0) + 1
             db["pets"][user_id]["xp"] = db["pets"][user_id].get("xp", 0) + 35
 
-            # Subir de nível
             lvl_up_txt = ""
             if db["pets"][user_id]["xp"] >= 150:
                 db["pets"][user_id]["nivel"] = db["pets"][user_id].get("nivel", 1) + 1
@@ -460,12 +484,13 @@ class PetRPG(commands.Cog):
 
             save_rpg_db(db)
 
-            # Verifica se o membro foi promovido de Rank de Aventureiro
             promocao = await checar_promocao_rank(interaction.user, db["pets"][user_id]["nivel"], db)
+
+            txt_bonus = f" *(+{int((beneficios['bonus_gold']-1)*100)}% de Bônus de Rank)*" if beneficios['bonus_gold'] > 1.0 else ""
 
             embed = discord.Embed(
                 title="⚔️ Vitória na Masmorra!",
-                description=f"Seu pet derrotou um **{monstro_escolhido}**!\n\n💰 Recompensa: **{recompensa_gold} Golds**{lvl_up_txt}",
+                description=f"Seu pet derrotou um **{monstro_escolhido}**!\n\n💰 Recompensa: **{recompensa_gold:,} Golds**{txt_bonus}{lvl_up_txt}",
                 color=discord.Color.green()
             )
             if promocao:
@@ -482,8 +507,7 @@ class PetRPG(commands.Cog):
             )
 
         await interaction.followup.send(embed=embed)
-        
-        
+
     @app_commands.command(name="boss", description="Enfrente o Chefe atual para ganhar recompensas épicas de Golds e XP!")
     async def boss(self, interaction: discord.Interaction):
         await interaction.response.defer()
@@ -627,6 +651,7 @@ class PetRPG(commands.Cog):
 
         info = dados_bioma[bioma.value]
         evento_perigo = random.random() < info["chance_perigo"]
+        beneficios = obter_beneficios_pet(pet.get("nivel", 1), db)
 
         promocao = None
 
@@ -636,8 +661,10 @@ class PetRPG(commands.Cog):
             vitoria = random.random() < chance_vitoria
 
             if vitoria:
-                ouro_ganho = random.randint(15 * pet.get("nivel", 1), 40 * pet.get("nivel", 1))
+                ouro_base = random.randint(15 * pet.get("nivel", 1), 40 * pet.get("nivel", 1))
+                ouro_ganho = int(ouro_base * beneficios["bonus_gold"])
                 xp_ganho = random.randint(15, 35)
+                
                 economy.add_gold(interaction.user.id, ouro_ganho)
                 
                 pet["vitorias"] = pet.get("vitorias", 0) + 1
@@ -652,14 +679,15 @@ class PetRPG(commands.Cog):
 
                 save_rpg_db(db)
 
-                # Verifica se o membro foi promovido de Rank de Aventureiro
                 promocao = await checar_promocao_rank(interaction.user, pet["nivel"], db)
+
+                txt_bonus = f" *(+{int((beneficios['bonus_gold']-1)*100)}% Bônus de Rank)*" if beneficios['bonus_gold'] > 1.0 else ""
 
                 embed = discord.Embed(
                     title=f"⚔️ Vitória Difícil em {info['nome']}!",
                     description=(
                         f"Após um combate duríssimo, seu pet superou o feroz **{monstro}**!\n\n"
-                        f"💰 **Recompensa:** `{ouro_ganho:,}` Golds\n"
+                        f"💰 **Recompensa:** `{ouro_ganho:,}` Golds{txt_bonus}\n"
                         f"✨ **XP Obtido:** `+{xp_ganho} XP`"
                         f"{' \n\n🎉 **LEVEL UP! Seu pet alcançou o nível ' + str(pet['nivel']) + '!**' if lvl_up else ''}"
                     ),
@@ -683,7 +711,8 @@ class PetRPG(commands.Cog):
                     color=discord.Color.red()
                 )
         else:
-            ouro_ganho = random.randint(10, 25)
+            ouro_base = random.randint(10, 25)
+            ouro_ganho = int(ouro_base * beneficios["bonus_gold"])
             economy.add_gold(interaction.user.id, ouro_ganho)
             pet["xp"] = pet.get("xp", 0) + 10
             
@@ -728,7 +757,7 @@ class PetRPG(commands.Cog):
             else:
                 await interaction.followup.send(f"{interaction.user.mention}", embed=convite_embed, view=view, ephemeral=False)
 
-        embed.set_footer(text=f"Explorador: {interaction.user.display_name} • 🐾 Pet: {pet.get('nome', 'Pet')} (Nv. {pet.get('nivel', 1)})")
+        embed.set_footer(text=f"Explorador: {interaction.user.display_name} • 🐾 Pet: {pet.get('nome', 'Pet')} (Nv. {pet.get('nivel', 1)}) • Rank: {beneficios['rank_nome']}")
         await interaction.followup.send(embed=embed)
 
 async def setup(bot):
