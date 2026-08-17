@@ -346,6 +346,77 @@ class PetRPG(commands.Cog):
             )
 
         await interaction.followup.send(embed=embed)
+        
+        
+    @app_commands.command(name="boss", description="Enfrente o Chefe atual para ganhar recompensas épicas de Golds e XP!")
+    async def boss(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+
+        db = load_rpg_db()
+        user_id = str(interaction.user.id)
+
+        if user_id not in db["pets"]:
+            return await interaction.followup.send("⚠️ Você precisa adotar um pet primeiro para enfrentar o Boss! Use `/pet_adotar`.", ephemeral=True)
+
+        # Verifica se há um boss ativo na database do RPG (ou define um padrão caso não exista)
+        boss_data = db.get("boss_atual", {"nome": "Dragão das Sombras", "vida": 1000, "vida_max": 1000, "nivel": 5})
+        
+        if boss_data["vida"] <= 0:
+            return await interaction.followup.send("🏆 O Boss atual já foi derrotado! Aguarde um administrador invocar o próximo com `/set_boss`.", ephemeral=True)
+
+        # Mecânica de dano baseada na sorte e pet
+        dano_causado = random.randint(50, 150)
+        boss_data["vida"] -= dano_causado
+        if boss_data["vida"] < 0:
+            boss_data["vida"] = 0
+
+        db["boss_atual"] = boss_data
+        save_rpg_db(db)
+
+        embed = discord.Embed(
+            title=f"⚔️ Batalha contra o Boss: {boss_data['nome']}",
+            description=(
+                f"{interaction.user.mention} atacou ferozmente o chefe com seu pet!\n\n"
+                f"💥 **Dano Causado:** `{dano_causado:,}`\n"
+                f"❤️ **HP do Boss:** `{boss_data['vida']:,} / {boss_data['vida_max']:,}`\n"
+            ),
+            color=discord.Color.dark_red()
+        )
+
+        if boss_data["vida"] == 0:
+            recompensa = random.randint(500, 1000)
+            economy.add_gold(interaction.user.id, recompensa)
+            embed.add_field(
+                name="🎉 VITÓRIA ÉPICA!",
+                value=f"O Boss foi derrotado! {interaction.user.mention} desferiu o golpe final e ganhou **{recompensa:,} Golds** 📀!",
+                inline=False
+            )
+        else:
+            embed.set_footer(text="Continue atacando para derrubá-lo!")
+
+        await interaction.followup.send(embed=embed)
+
+    @app_commands.command(name="set_boss", description="[Admin] Invoca ou configura um novo Boss para o servidor.")
+    @app_commands.describe(nome="Nome do Boss", vida="Quantidade de vida (HP)", nivel="Nível do Boss")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def set_boss(self, interaction: discord.Interaction, nome: str, vida: int, nivel: int = 1):
+        await interaction.response.defer(ephemeral=True)
+
+        db = load_rpg_db()
+        db["boss_atual"] = {
+            "nome": nome,
+            "vida": vida,
+            "vida_max": vida,
+            "nivel": nivel
+        }
+        save_rpg_db(db)
+
+        embed = discord.Embed(
+            title="⚠️ Novo Boss Invocado!",
+            description=f"O administrador {interaction.user.mention} convocou um novo desafio!\n\n👹 **Nome:** `{nome}`\n❤️ **HP:** `{vida:,}`\n⭐ **Nível:** `{nivel}`",
+            color=discord.Color.orange()
+        )
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="explorar", description="Explore os biomas perigosos de Yggdrasil (Requer Nível 20 ou superior).")
     @app_commands.choices(bioma=[
