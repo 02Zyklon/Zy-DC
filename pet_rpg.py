@@ -303,6 +303,52 @@ class PetRPG(commands.Cog):
 
         await interaction.followup.send(embed=embed)
 
+
+        @app_commands.command(name="foguinho", description="Testa sua sorte no clássico jogo do foguinho apostando Golds.")
+    @app_commands.describe(aposta="Quantidade de Golds que você deseja apostar")
+    async def foguinho(self, interaction: discord.Interaction, aposta: int):
+        await interaction.response.defer()
+
+        if aposta <= 0:
+            return await interaction.followup.send("❌ A aposta deve ser maior que 0 Golds!", ephemeral=True)
+
+        saldo_atual = economy.get_gold(interaction.user.id)
+        if saldo_atual < aposta:
+            return await interaction.followup.send(
+                f"❌ **Saldo Insuficiente!** Você tem `{saldo_atual:,} Golds`, mas tentou apostar `{aposta:,} Golds`.",
+                ephemeral=True
+            )
+
+        # Mecânica do foguinho: 50% de chance de ganhar o dobro ou perder a aposta
+        ganhou = random.choice([True, False])
+
+        if ganhou:
+            lucro = aposta
+            economy.add_gold(interaction.user.id, lucro)
+            embed = discord.Embed(
+                title="🔥 Foguinho — Vitória!",
+                description=(
+                    f"As chamas brilharam a seu favor, {interaction.user.mention}!\n\n"
+                    f"💰 **Aposta:** `{aposta:,} Golds`\n"
+                    f"✨ **Lucro Obtido:** `+{lucro:,} Golds`\n"
+                    f"🪙 **Novo Saldo:** `{economy.get_gold(interaction.user.id):,} Golds`"
+                ),
+                color=discord.Color.green()
+            )
+        else:
+            economy.remove_gold(interaction.user.id, aposta)
+            embed = discord.Embed(
+                title="💥 Foguinho — Queimado!",
+                description=(
+                    f"O fogo consumiu sua aposta, {interaction.user.mention}...\n\n"
+                    f"💸 **Valor Perdido:** `-{aposta:,} Golds`\n"
+                    f"🪙 **Saldo Restante:** `{economy.get_gold(interaction.user.id):,} Golds`"
+                ),
+                color=discord.Color.red()
+            )
+
+        await interaction.followup.send(embed=embed)
+
     @app_commands.command(name="explorar", description="Explore os biomas perigosos de Yggdrasil (Requer Nível 20 ou superior).")
     @app_commands.choices(bioma=[
         app_commands.Choice(name="🌲 Floresta Sombria", value="floresta"),
