@@ -300,65 +300,139 @@ async def rank(interaction: discord.Interaction):
 # =========================================================
 class TicTacToeButton(discord.ui.Button):
     def __init__(self, x: int, y: int):
-        super().__init__(style=discord.ButtonStyle.secondary, label="", row=y)
-        self.x, self.y = x, y
+        super().__init__(
+            style=discord.ButtonStyle.secondary, 
+            label=" ",  # 👈 Evita o erro 50035 (Invalid Form Body)
+            row=y
+        )
+        self.x = x
+        self.y = y
 
     async def callback(self, interaction: discord.Interaction):
         view: TicTacToeView = self.view
-        if view.board[self.y][self.x] != 0:
-            return await interaction.response.send_message("❌ Posição ocupada!", ephemeral=True)
-        if interaction.user != view.current_player:
-            return await interaction.response.send_message("❌ Não é sua vez!", ephemeral=True)
 
-        if view.current_player == view.player_x:
-            self.style, self.label = discord.ButtonStyle.danger, "X"
-            view.board[self.y][self.x] = 1
-            view.current_player = view.player_o
-            content = f"Vez de: {view.player_o.mention} (O)"
-        else:
-            self.style, self.label = discord.ButtonStyle.primary, "O"
-            view.board[self.y][self.x] = 2
-            view.current_player = view.player_x
-            content = f"Vez de: {view.player_x.mention} (X)"
-
-        self.disabled = True
-        winner = view.check_winner()
-
-        if winner is not None:
-            content = f"🎉 **{view.player_x.mention} (X) Venceu!**" if winner == 1 else (
-                f"🎉 **{view.player_o.mention} (O) Venceu!**" if winner == 2 else "👔 **Empate!**"
+        # Verifica se é o turno do jogador correto
+        if interaction.user != view.jogador_atual:
+            return await interaction.response.send_message(
+                f"⏳ Aguarde sua vez! É a vez de {view.jogador_atual.mention}.", 
+                ephemeral=True
             )
-            for child in view.children: child.disabled = True
-            view.stop()
 
-        await interaction.response.edit_message(content=content, view=view)
+        # Atualiza a célula do tabuleiro
+        view.board[self.y][self.x] = view.simbolo_atual
+        self.label = view.simbolo_atual
+        self.disabled = True
+
+        if view.simbolo_atual == "X":
+            self.style = discord.ButtonStyle.danger  # Vermelho para X
+        else:
+            self.style = discord.ButtonStyle.primary # Azul para O
+
+        # Checa vitória ou empate
+        vencedor = view.checar_vitoria()
+
+        if vencedor:
+            view.desativar_todos_botoes()
+            embed = discord.Embed(
+                title="🏆 Fim de Jogo — Vitória!",
+                description=f"🎉 **{interaction.user.mention}** ({vencedor}) venceu a partida!",
+                color=discord.Color.green()
+            )
+            await interaction.response.edit_message(embed=embed, view=view)
+            view.stop()
+            return
+
+        if view.checar_empate():
+            view.desativar_todos_botoes()
+            embed = discord.Embed(
+                title="🤝 Fim de Jogo — Empate!",
+                description="O jogo terminou em **Velha**!",
+                color=discord.Color.gold()
+            )
+            await interaction.response.edit_message(embed=embed, view=view)
+            view.stop()
+            return
+
+        # Alterna o turno
+        view.alternar_turno()
+        
+        embed = discord.Embed(
+            title="❌ Jogo da Velha ⭕",
+            description=f"🎮 **Partida:** {view.p1.mention} (❌) vs {view.p2.mention} (⭕)\n👉 **Vez de:** {view.jogador_atual.mention} ({view.simbolo_atual})",
+            color=discord.Color.blue()
+        )
+        await interaction.response.edit_message(embed=embed, view=view)
 
 
 class TicTacToeView(discord.ui.View):
-    def __init__(self, player_x: discord.Member, player_o: discord.Member):
+    def __init__(self, p1: discord.Member, p2: discord.Member):
         super().__init__(timeout=180)
-        self.player_x, self.player_o, self.current_player = player_x, player_o, player_x
-        self.board = [[0]*3 for _ in range(3)]
+        self.p1 = p1
+        self.p2 = p2
+        self.jogador_atual = p1
+        self.simbolo_atual = "X"
+        self.board = [[" " for _ in range(3)] for _ in range(3)]
+
+        # Monta a grade 3x3 com labels em branco
         for y in range(3):
             for x in range(3):
                 self.add_item(TicTacToeButton(x, y))
 
-    def check_winner(self):
+    def alternar_turno(self):
+        if self.jogador_atual == self.p1:
+            self.jogador_atual = self.p2
+            self.simbolo_atual = "O"
+        else:
+            self.jogador_atual = self.p1
+            self.simbolo_atual = "X"
+
+    def desativar_todos_botoes(self):
+        for child in self.children:
+            if isinstance(child, discord.ui.Button):
+                child.disabled = True
+
+    def checar_vitoria(self):
+        b = self.board
+        # Linhas, Colunas e Diagonais
         for i in range(3):
-            if self.board[i][0] == self.board[i][1] == self.board[i][2] != 0: return self.board[i][0]
-            if self.board[0][i] == self.board[1][i] == self.board[2][i] != 0: return self.board[0][i]
-        if self.board[0][0] == self.board[1][1] == self.board[2][2] != 0: return self.board[0][0]
-        if self.board[0][2] == self.board[1][1] == self.board[2][0] != 0: return self.board[0][2]
-        if all(cell != 0 for row in self.board for cell in row): return 0
+            if b[i][0] == b[i][1] == b[i][2] != " ":
+                return b[i][0]
+            if b[0][i] == b[1][i] == b[2][i] != " ":
+                return b[0][i]
+        
+        if b[0][0] == b[1][1] == b[2][2] != " ":
+            return b[0][0]
+        if b[0][2] == b[1][1] == b[2][0] != " ":
+            return b[0][2]
+            
         return None
 
+    def checar_empate(self):
+        for row in self.board:
+            if " " in row:
+                return False
+        return True
 
-@bot.tree.command(name="velha", description="Desafie um amigo para o Jogo da Velha!")
+
+# Comando para registrar no seu Cog ou bot:
+@app_commands.command(name="velha", description="Desafie outro membro do servidor para um Jogo da Velha!")
+@app_commands.describe(oponente="Membro que você deseja desafiar")
 async def velha(interaction: discord.Interaction, oponente: discord.Member):
-    if oponente.bot or oponente.id == interaction.user.id:
-        return await interaction.response.send_message("❌ Oponente inválido!", ephemeral=True)
-    view = TicTacToeView(player_x=interaction.user, player_o=oponente)
-    await interaction.response.send_message(f"🎮 **Jogo da Velha!**\n{interaction.user.mention} (X) vs {oponente.mention} (O)", view=view)
+    if oponente.bot:
+        return await interaction.response.send_message("❌ Você não pode jogar contra um bot!", ephemeral=True)
+
+    if oponente == interaction.user:
+        return await interaction.response.send_message("❌ Você não pode jogar contra si mesmo!", ephemeral=True)
+
+    view = TicTacToeView(p1=interaction.user, p2=oponente)
+    
+    embed = discord.Embed(
+        title="❌ Jogo da Velha ⭕",
+        description=f"🎮 **Partida:** {interaction.user.mention} (❌) vs {oponente.mention} (⭕)\n👉 **Vez de:** {interaction.user.mention} (❌)",
+        color=discord.Color.blue()
+    )
+    
+    await interaction.response.send_message(content=f"{oponente.mention}", embed=embed, view=view)
 
 
 # =========================================================
