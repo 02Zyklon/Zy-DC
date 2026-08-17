@@ -111,6 +111,28 @@ class PetRPG(commands.Cog):
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
 
+        @app_commands.command(name="daily", description="Coleta sua recompensa diária de Golds.")
+    @app_commands.checks.cooldown(1, 86400, key=lambda i: i.user.id) # 24 horas de cooldown
+    async def daily(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+
+        db = load_rpg_db()
+        user_id = str(interaction.user.id)
+
+        if user_id not in db["pets"]:
+            return await interaction.followup.send("⚠️ Você precisa adotar um pet primeiro para resgatar o seu daily! Use `/pet_adotar`.", ephemeral=True)
+
+        recompensa = random.randint(100, 300)
+        economy.add_gold(interaction.user.id, recompensa)
+
+        embed = discord.Embed(
+            title="🎁 Recompensa Diária Resgatada!",
+            description=f"Parabéns! Você resgatou o seu bônus diário e ganhou **{recompensa:,} Golds** 📀.",
+            color=discord.Color.gold()
+        )
+        embed.set_footer(text=f"Saldo atual: {economy.get_gold(interaction.user.id):,} Golds")
+        await interaction.followup.send(embed=embed)
+
     @app_commands.command(name="pet_perfil", description="Exibe os status, vida e vitórias do seu Pet.")
     async def pet_perfil(self, interaction: discord.Interaction):
         await interaction.response.defer()
