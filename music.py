@@ -35,7 +35,14 @@ YTDL_OPTIONS = {
     'quiet': True,
     'no_warnings': True,
     'default_search': 'auto',
-    'source_address': '0.0.0.0'
+    'source_address': '0.0.0.0',
+    # Bypass para evitar o bloqueio de bot do YouTube em servidores cloud
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'ios'],
+            'skip': ['webpage', 'configs']
+        }
+    }
 }
 
 # Opções do FFmpeg para manter o stream estável sem travamentos
