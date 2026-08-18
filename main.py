@@ -1207,10 +1207,22 @@ async def main():
             print("❌ ERRO CRÍTICO: DISCORD_TOKEN não encontrado!")
             return
         
-        # Carrega a Cog do RPG dinamicamente
-        await bot.load_extension("pet_rpg")
+        # Carrega a Cog do RPG (pet_rpg.py na raiz)
+        try:
+            await bot.load_extension("pet_rpg")
+            print("🟢 Cog 'pet_rpg' carregada!")
+        except Exception as e:
+            print(f"⚠️ Erro ao carregar 'pet_rpg': {e}")
+
+        # Carrega a Cog de Música (music.py dentro da pasta cogs/)
+        try:
+            await bot.load_extension("cogs.music")
+            print("🟢 Cog 'cogs.music' carregada!")
+        except Exception as e:
+            print(f"⚠️ Erro ao carregar 'cogs.music': {e}")
         
+        # Inicia o bot (com parênteses () no token)
         await bot.start(token)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main())q
