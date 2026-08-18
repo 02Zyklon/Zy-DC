@@ -32,16 +32,13 @@ YTDL_OPTIONS = {
     'nocheckcertificate': True,
     'ignoreerrors': False,
     'logtostderr': False,
-    'quiet': True,
+    'quiet': False, # Deixe False temporariamente para ver a mensagem do código nos logs
     'no_warnings': True,
     'default_search': 'auto',
     'source_address': '0.0.0.0',
-    # Bypass para evitar o bloqueio de bot do YouTube em servidores cloud
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['android', 'ios'],
-            'skip': ['webpage', 'configs']
-        }
+    'username': 'oauth2',
+    'password': ''
+}
     }
 }
 
