@@ -11,3 +11,5 @@ yt-dlp
 PyNaCl
 davey
 spotipy
+yt-dlp
+yt-dlp-get-pot
