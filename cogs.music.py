@@ -7,7 +7,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import os
 
-# Configuração do Spotify (Opcional - usa credenciais se existirem no .env)
+# Configuração do Spotify (Opcional)
 SPOTIPY_CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
 SPOTIPY_CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
 
@@ -32,14 +32,10 @@ YTDL_OPTIONS = {
     'nocheckcertificate': True,
     'ignoreerrors': False,
     'logtostderr': False,
-    'quiet': False, # Deixe False temporariamente para ver a mensagem do código nos logs
+    'quiet': True,
     'no_warnings': True,
-    'default_search': 'auto',
-    'source_address': '0.0.0.0',
-    'username': 'oauth2',
-    'password': ''
-}
-    }
+    'default_search': 'ytsearch',
+    'source_address': '0.0.0.0'
 }
 
 # Opções do FFmpeg para manter o stream estável sem travamentos
@@ -55,7 +51,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
         super().__init__(source, volume)
         self.data = data
         self.title = data.get('title')
-        self.url = data.get('url')
+        self.url = data.get('webpage_url', data.get('url'))
 
     @classmethod
     async def from_url(cls, url, *, loop=None, stream=True):
@@ -103,7 +99,7 @@ class Musica(commands.Cog):
             player = await YTDLSource.from_url(busca, loop=self.bot.loop, stream=True)
 
             if not voice_client.is_playing():
-                voice_client.play(player, after=lambda e: print(f'Erro no reprodução: {e}') if e else None)
+                voice_client.play(player, after=lambda e: print(f'Erro na reprodução: {e}') if e else None)
                 
                 embed = discord.Embed(
                     title="🎵 Tocando Agora",
