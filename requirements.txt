@@ -7,3 +7,6 @@ Pillow>=10.0.0
 google-genai
 openai
 aiofiles
+yt-dlp
+PyNaCl
+spotipy
