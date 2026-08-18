@@ -1216,7 +1216,7 @@ async def main():
 
         # Carrega a Cog de Música (music.py dentro da pasta cogs/)
         try:
-            await bot.load_extension("cogs.music")
+            await bot.load_extension("music")
             print("🟢 Cog 'cogs.music' carregada!")
         except Exception as e:
             print(f"⚠️ Erro ao carregar 'cogs.music': {e}")
