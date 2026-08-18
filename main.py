@@ -121,9 +121,12 @@ def save_json(file_path, data):
 
 @bot.event
 async def on_ready():
-    guild = discord.Object(id=GUILD_ID)
-    bot.tree.copy_global_to(guild=guild)
-    await bot.tree.sync(guild=guild)
+    # Sincroniza a árvore de comandos globalmente ao ligar
+    try:
+        synced = await bot.tree.sync()
+        print(f"🌐 Sincronizados {len(synced)} comandos Slash globalmente!")
+    except Exception as e:
+        print(f"⚠️ Erro ao sincronizar comandos: {e}")
     
     # Tornar as Views persistentes (não somem/quebram ao reiniciar)
     bot.add_view(PainelTicketView())
@@ -322,7 +325,7 @@ class TicTacToeButton(discord.ui.Button):
     def __init__(self, x: int, y: int):
         super().__init__(
             style=discord.ButtonStyle.secondary, 
-            label=" ",  # 👈 Evita o erro 50035 (Invalid Form Body)
+            label=" ",  
             row=y
         )
         self.x = x
@@ -331,24 +334,21 @@ class TicTacToeButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         view: TicTacToeView = self.view
 
-        # Verifica se é o turno do jogador correto
         if interaction.user != view.jogador_atual:
             return await interaction.response.send_message(
                 f"⏳ Aguarde sua vez! É a vez de {view.jogador_atual.mention}.", 
                 ephemeral=True
             )
 
-        # Atualiza a célula do tabuleiro
         view.board[self.y][self.x] = view.simbolo_atual
         self.label = view.simbolo_atual
         self.disabled = True
 
         if view.simbolo_atual == "X":
-            self.style = discord.ButtonStyle.danger  # Vermelho para X
+            self.style = discord.ButtonStyle.danger  
         else:
-            self.style = discord.ButtonStyle.primary # Azul para O
+            self.style = discord.ButtonStyle.primary 
 
-        # Checa vitória ou empate
         vencedor = view.checar_vitoria()
 
         if vencedor:
@@ -373,7 +373,6 @@ class TicTacToeButton(discord.ui.Button):
             view.stop()
             return
 
-        # Alterna o turno
         view.alternar_turno()
         
         embed = discord.Embed(
@@ -393,7 +392,6 @@ class TicTacToeView(discord.ui.View):
         self.simbolo_atual = "X"
         self.board = [[" " for _ in range(3)] for _ in range(3)]
 
-        # Monta a grade 3x3 com labels em branco
         for y in range(3):
             for x in range(3):
                 self.add_item(TicTacToeButton(x, y))
@@ -413,7 +411,6 @@ class TicTacToeView(discord.ui.View):
 
     def checar_vitoria(self):
         b = self.board
-        # Linhas, Colunas e Diagonais
         for i in range(3):
             if b[i][0] == b[i][1] == b[i][2] != " ":
                 return b[i][0]
@@ -1207,21 +1204,21 @@ async def main():
             print("❌ ERRO CRÍTICO: DISCORD_TOKEN não encontrado!")
             return
         
-        # Carrega a Cog do RPG (pet_rpg.py na raiz)
+        # 1. Carrega a Cog do RPG (pet_rpg.py na raiz)
         try:
             await bot.load_extension("pet_rpg")
             print("🟢 Cog 'pet_rpg' carregada!")
         except Exception as e:
             print(f"⚠️ Erro ao carregar 'pet_rpg': {e}")
 
-        # Carrega a Cog de Música (music.py dentro da pasta cogs/)
+        # 2. Carrega a Cog de Música (music.py dentro de cogs/)
         try:
-            await bot.load_extension("music")
+            await bot.load_extension("cogs.music")
             print("🟢 Cog 'cogs.music' carregada!")
         except Exception as e:
             print(f"⚠️ Erro ao carregar 'cogs.music': {e}")
         
-        # Inicia o bot (com parênteses () no token)
+        # 3. Inicia o bot
         await bot.start(token)
 
 if __name__ == "__main__":
