@@ -9,4 +9,5 @@ openai
 aiofiles
 yt-dlp
 PyNaCl
+davey
 spotipy
