@@ -17,7 +17,7 @@ YTDL_OPTIONS = {
     'logtostderr': False,
     'quiet': True,
     'no_warnings': True,
-    'default_search': 'ytsearch',
+    'default_search': 'scsearch',
     'source_address': '0.0.0.0'
 }
 
