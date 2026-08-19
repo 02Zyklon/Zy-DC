@@ -1,4 +1,4 @@
-mport discord
+import discord
 from discord.ext import commands
 from discord import app_commands
 import wavelink
@@ -8,7 +8,6 @@ class Music(commands.Cog):
         self.bot = bot
 
     async def cog_load(self):
-        # 🔗 Sistema com Servidores Principais e Reservas (Redundância)
         nodes = [
             wavelink.Node(
                 identifier="Node_Principal",
@@ -21,15 +20,14 @@ class Music(commands.Cog):
                 password="youshallnotpass"
             )
         ]
-        # Conecta aos servidores sem travar a inicialização do bot
         await wavelink.Pool.connect(nodes=nodes, client=self.bot, cache_capacity=100)
 
     @commands.Cog.listener()
     async def on_wavelink_node_ready(self, payload: wavelink.NodeReadyEventPayload):
-        print(f"🟢 Lavalink Conectado com Sucesso: {payload.node.identifier}")
+        print(f"🟢 Lavalink Conectado: {payload.node.identifier}")
 
     @app_commands.command(name="play", description="Toca uma música no canal de voz")
-    @app_commands.describe(busca="Nome da música, artista ou link")
+    @app_commands.describe(busca="Nome da música ou link")
     async def play(self, interaction: discord.Interaction, busca: str):
         await interaction.response.defer(thinking=True)
 
@@ -38,7 +36,6 @@ class Music(commands.Cog):
 
         voice_channel = interaction.user.voice.channel
         
-        # Conecta ao canal de voz usando o player do Wavelink (Sem FFmpeg!)
         if not interaction.guild.voice_client:
             player: wavelink.Player = await voice_channel.connect(cls=wavelink.Player)
         else:
@@ -46,7 +43,6 @@ class Music(commands.Cog):
             if player.channel != voice_channel:
                 await player.move_to(voice_channel)
 
-        # Busca a música (SoundCloud ou Link Direto)
         tracks = await wavelink.Playable.search(busca, source=wavelink.TrackSource.SoundCloud)
         if not tracks:
             return await interaction.followup.send("❌ Nenhuma música encontrada.")
