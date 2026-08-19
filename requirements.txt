@@ -12,3 +12,4 @@ PyNaCl
 davey
 spotipy
 wavelink
+static-ffmpeg
