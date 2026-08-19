@@ -7,16 +7,16 @@ class Music(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    async def cog_load(self):
+   async def cog_load(self):
         nodes = [
             wavelink.Node(
-                identifier="Node_Koyeb",
-                uri="https://lavalink-v3.koyeb.app:443",
+                identifier="Node_Node1",
+                uri="https://lava.link:443",
                 password="youshallnotpass"
             ),
             wavelink.Node(
-                identifier="Node_Lava1",
-                uri="https://lavalink.jirayu.net:443",
+                identifier="Node_Serenade",
+                uri="https://lavalink.serenade.gq:443",
                 password="youshallnotpass"
             )
         ]
