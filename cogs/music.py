@@ -1,39 +1,36 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-import wavelink
+import yt_dlp
+import asyncio
+
+# Configurações do YT-DLP para extrair o áudio direto
+YTDL_OPTIONS = {
+    'format': 'bestaudio/best',
+    'extractaudio': True,
+    'audioformat': 'mp3',
+    'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
+    'restrictfilenames': True,
+    'noplaylist': True,
+    'nocheckcertificate': True,
+    'ignoreerrors': False,
+    'logtostderr': False,
+    'quiet': True,
+    'no_warnings': True,
+    'default_search': 'ytsearch',
+    'source_address': '0.0.0.0'
+}
+
+FFMPEG_OPTIONS = {
+    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+    'options': '-vn'
+}
 
 class Music(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    async def cog_load(self):
-        # Cria uma tarefa em background para conectar assim que o bot estiver online no Discord
-        self.bot.loop.create_task(self.connect_nodes())
-
-    async def connect_nodes(self):
-        # Aguarda o bot carregar o ID do usuário/cliente no Discord
-        await self.bot.wait_until_ready()
-
-        nodes = [
-            wavelink.Node(
-                identifier="meu-lavalink",
-                uri="https://meu-lavalink-q57d.onrender.com",
-                password="zyklon123",
-                retries=10
-            )
-        ]
-        
-        try:
-            await wavelink.Pool.connect(nodes=nodes, client=self.bot, cache_capacity=100)
-        except Exception as e:
-            print(f"⚠️ Erro ao conectar ao Lavalink: {e}")
-
-    @commands.Cog.listener()
-    async def on_wavelink_node_ready(self, payload: wavelink.NodeReadyEventPayload):
-        print(f"🟢 Lavalink Conectado com Sucesso: {payload.node.identifier}")
-
-    @app_commands.command(name="play", description="Toca uma música no canal de voz")
+    @app_commands.command(name="play", description="Toca uma música diretamente no canal de voz")
     @app_commands.describe(busca="Nome da música ou link")
     async def play(self, interaction: discord.Interaction, busca: str):
         await interaction.response.defer(thinking=True)
@@ -43,40 +40,43 @@ class Music(commands.Cog):
 
         voice_channel = interaction.user.voice.channel
 
+        # Conecta ao canal de voz usando a API nativa do Discord
         if not interaction.guild.voice_client:
-            player: wavelink.Player = await voice_channel.connect(cls=wavelink.Player)
+            vc = await voice_channel.connect()
         else:
-            player: wavelink.Player = interaction.guild.voice_client
-            if player.channel != voice_channel:
-                await player.move_to(voice_channel)
+            vc = interaction.guild.voice_client
+            if vc.channel != voice_channel:
+                await vc.move_to(voice_channel)
 
-        tracks = await wavelink.Playable.search(busca, source=wavelink.TrackSource.SoundCloud)
-        if not tracks:
-            return await interaction.followup.send("❌ Nenhuma música encontrada.")
+        if vc.is_playing():
+            return await interaction.followup.send("⚠️ Já tem uma música tocando! Pare a anterior primeiro.")
 
-        track = tracks[0]
+        # Busca o áudio via yt-dlp
+        loop = asyncio.get_event_loop()
+        try:
+            with yt_dlp.YoutubeDL(YTDL_OPTIONS) as ytdl:
+                data = await loop.run_in_executor(None, lambda: ytdl.extract_info(busca, download=False))
+                
+                if 'entries' in data:
+                    data = data['entries'][0]
 
-        if player.playing or not player.queue.is_empty:
-            await player.queue.put_wait(track)
-            await interaction.followup.send(f"➕ Adicionado à fila: **{track.title}**")
-        else:
-            await player.play(track)
-            await interaction.followup.send(f"🎶 Tocando agora: **{track.title}**")
+                url = data['url']
+                title = data.get('title', 'Música')
 
-    @app_commands.command(name="skip", description="Pula a música atual")
-    async def skip(self, interaction: discord.Interaction):
-        player: wavelink.Player = interaction.guild.voice_client
-        if player and (player.playing or player.paused):
-            await player.skip(force=True)
-            await interaction.response.send_message("⏭️ Música pulada!")
-        else:
-            await interaction.response.send_message("❌ Nenhuma música tocando no momento.")
+            # Toca o stream de áudio via FFmpeg
+            audio_source = discord.FFmpegPCMAudio(url, **FFMPEG_OPTIONS)
+            vc.play(audio_source)
 
-    @app_commands.command(name="stop", description="Para a música e desconecta o bot")
+            await interaction.followup.send(f"🎶 Tocando agora: **{title}**")
+
+        except Exception as e:
+            await interaction.followup.send(f"❌ Erro ao tentar tocar a música: {e}")
+
+    @app_commands.command(name="stop", description="Para a música e desconecta")
     async def stop(self, interaction: discord.Interaction):
-        player: wavelink.Player = interaction.guild.voice_client
-        if player:
-            await player.disconnect()
+        vc = interaction.guild.voice_client
+        if vc and vc.is_connected():
+            await vc.disconnect()
             await interaction.response.send_message("🛑 Bot desconectado!")
         else:
             await interaction.response.send_message("❌ O bot não está em um canal de voz.")
