@@ -4,9 +4,8 @@ from discord import app_commands
 import yt_dlp
 import asyncio
 
-# Configurações do yt-dlp para extrair apenas o áudio com melhor qualidade
+# Configurações do yt-dlp para extrair apenas o áudio
 YTDL_OPTIONS = {
-    'cookiefile': 'cookies.txt',
     'format': 'bestaudio/best',
     'extractaudio': True,
     'audioformat': 'mp3',
@@ -18,17 +17,8 @@ YTDL_OPTIONS = {
     'logtostderr': False,
     'quiet': True,
     'no_warnings': True,
-    'default_search': 'ytsearch',  # Mantém a busca padronizada
+    'default_search': 'auto',
     'source_address': '0.0.0.0',
-    # --- BURLAR O BLOQUEIO DE BOT ---
-    'nocheckwebpage': True,
-    'youtube_include_dash_manifest': False,
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['android', 'web'], # Utiliza o cliente mobile do Android que ignora o PoToken
-            'skip': ['hls', 'dash']
-        }
-    }
 }
 
 # Configurações do FFmpeg para otimização do streaming de voz
@@ -42,7 +32,7 @@ ytdl = yt_dlp.YoutubeDL(YTDL_OPTIONS)
 class Music(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.queues = {}  # Fila de músicas por ID da guilda
+        self.queues = {}
 
     def get_queue(self, guild_id: int):
         if guild_id not in self.queues:
@@ -61,32 +51,28 @@ class Music(commands.Cog):
                     source, 
                     after=lambda e: self.play_next(interaction)
                 )
-                # Envia mensagem no canal informando a próxima música
                 asyncio.run_coroutine_threadsafe(
                     interaction.channel.send(f"🎵 Tocando agora: **{next_song['title']}**"),
                     self.bot.loop
                 )
 
-   @app_commands.command(name="play", description="Toca uma música ou adiciona à fila (URL ou busca)")
+    @app_commands.command(name="play", description="Toca uma música ou adiciona à fila (URL ou busca)")
     @app_commands.describe(busca="Nome da música ou link do YouTube")
     async def play(self, interaction: discord.Interaction, busca: str):
-        # ⚠️ IMPORTANTE: Responde ao Discord IMEDIATAMENTE em menos de 1 segundo!
+        # Evita a mensagem "Enviando comando..." travada
         await interaction.response.defer(thinking=True)
 
-        # 1. Verifica se o usuário está em um canal de voz
         if not interaction.user.voice or not interaction.user.voice.channel:
             return await interaction.followup.send("❌ Você precisa estar em um canal de voz!")
 
         voice_channel = interaction.user.voice.channel
         voice_client = interaction.guild.voice_client
 
-        # 2. Conecta ao canal de voz
         if voice_client is None:
             voice_client = await voice_channel.connect()
         elif voice_client.channel != voice_channel:
             await voice_client.move_to(voice_channel)
 
-        # 3. Extrai as informações de forma assíncrona para não travar
         loop = asyncio.get_running_loop()
         try:
             data = await loop.run_in_executor(
@@ -109,7 +95,6 @@ class Music(commands.Cog):
 
         queue = self.get_queue(interaction.guild_id)
 
-        # 4. Toca ou adiciona à fila
         if voice_client.is_playing() or voice_client.is_paused():
             queue.append(song_info)
             await interaction.followup.send(f"➕ Adicionado à fila: **{song_info['title']}**")
@@ -133,7 +118,7 @@ class Music(commands.Cog):
         if voice_client:
             self.queues[interaction.guild_id] = []
             await voice_client.disconnect()
-            await interaction.response.send_message("🛑 Reprodução parada e desconectado do canal!")
+            await interaction.response.send_message("🛑 Reprodução parada e desconectado!")
         else:
             await interaction.response.send_message("❌ O bot não está em um canal de voz.")
 
