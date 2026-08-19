@@ -7,11 +7,11 @@ class Music(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    async def cog_load(self):
-        # Conecta a um nó Lavalink público robusto e grátis (Lava-v4)
+   async def cog_load(self):
+        # Conecta a um nó Lavalink v4 ativo e estável
         node = wavelink.Node(
-            uri="https://lava-v4.ajieero.com:443", 
-            password="youwonthackme"
+            uri="https://lavalink.devamop.in:443", 
+            password="youshallnotpass"
         )
         await wavelink.Pool.connect(nodes=[node], client=self.bot)
 
