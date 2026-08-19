@@ -10,7 +10,7 @@ class Music(commands.Cog):
     async def cog_load(self):
         nodes = [
             wavelink.Node(
-                identifier="Meu_Lavalink_Privado",
+                identifier="Meu-lavalink",
                 uri="https://meu-lavalink-q57d.onrender.com:443",
                 password="$$$$zyklon$$$"
             )
