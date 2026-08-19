@@ -30,8 +30,9 @@ class Music(commands.Cog):
         self.bot = bot
 
     @app_commands.command(name="play", description="Toca uma música no canal de voz")
-    @app_commands.describe(busca="Nome da música ou link do SoundCloud")
+    @app_commands.describe(busca="Nome da música ou link")
     async def play(self, interaction: discord.Interaction, busca: str):
+        # ⚠️ O defer DEVE ser a PRIMEIRA linha do comando!
         await interaction.response.defer(thinking=True)
 
         if not interaction.user.voice or not interaction.user.voice.channel:
