@@ -14,3 +14,4 @@ davey
 spotipy
 wavelink>=3.0.0
 static-ffmpeg
+ffmpeg
