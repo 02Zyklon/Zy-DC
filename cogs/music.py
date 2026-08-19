@@ -67,34 +67,39 @@ class Music(commands.Cog):
                     self.bot.loop
                 )
 
-    @app_commands.command(name="play", description="Toca uma música ou adiciona à fila (URL ou busca)")
+   @app_commands.command(name="play", description="Toca uma música ou adiciona à fila (URL ou busca)")
     @app_commands.describe(busca="Nome da música ou link do YouTube")
     async def play(self, interaction: discord.Interaction, busca: str):
-        await interaction.response.defer()
+        # ⚠️ IMPORTANTE: Responde ao Discord IMEDIATAMENTE em menos de 1 segundo!
+        await interaction.response.defer(thinking=True)
 
         # 1. Verifica se o usuário está em um canal de voz
         if not interaction.user.voice or not interaction.user.voice.channel:
-            return await interaction.followup.send("❌ Você precisa estar em um canal de voz para usar este comando!")
+            return await interaction.followup.send("❌ Você precisa estar em um canal de voz!")
 
         voice_channel = interaction.user.voice.channel
         voice_client = interaction.guild.voice_client
 
-        # 2. Conecta ao canal de voz se ainda não estiver conectado
+        # 2. Conecta ao canal de voz
         if voice_client is None:
             voice_client = await voice_channel.connect()
         elif voice_client.channel != voice_channel:
             await voice_client.move_to(voice_channel)
 
-        # 3. Extrai as informações da música usando yt-dlp em uma thread separada
-        loop = asyncio.get_event_loop()
+        # 3. Extrai as informações de forma assíncrona para não travar
+        loop = asyncio.get_running_loop()
         try:
-            data = await loop.run_in_executor(None, lambda: ytdl.extract_info(f"ytsearch:{busca}", download=False))
+            data = await loop.run_in_executor(
+                None, 
+                lambda: ytdl.extract_info(f"ytsearch:{busca}", download=False)
+            )
+            
             if 'entries' in data and len(data['entries']) > 0:
                 data = data['entries'][0]
             elif 'entries' in data and not data['entries']:
-                return await interaction.followup.send("❌ Nenhuma música encontrada com esse termo.")
+                return await interaction.followup.send("❌ Nenhuma música encontrada.")
         except Exception as e:
-            return await interaction.followup.send(f"⚠️ Erro ao buscar a música: `{str(e)}`")
+            return await interaction.followup.send(f"⚠️ Erro na busca: `{str(e)}`")
 
         song_info = {
             'url': data['url'],
@@ -104,7 +109,7 @@ class Music(commands.Cog):
 
         queue = self.get_queue(interaction.guild_id)
 
-        # 4. Se o bot já estiver tocando algo, adiciona à fila. Caso contrário, toca imediatamente.
+        # 4. Toca ou adiciona à fila
         if voice_client.is_playing() or voice_client.is_paused():
             queue.append(song_info)
             await interaction.followup.send(f"➕ Adicionado à fila: **{song_info['title']}**")
