@@ -1,3 +1,10 @@
+Seu código tinha um erro de sintaxe (um fechamento de parênteses ) sobrando logo após a chamada do Pool.connect dentro do cog_load), o que faria o bot quebrar logo ao carregar o Cog.
+
+Além disso, ajustei alguns detalhes no comando de skip e no tratamento de filas do Wavelink v3.
+
+Aqui está o código 100% corrigido e limpo:
+
+Python
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -11,13 +18,13 @@ class Music(commands.Cog):
         nodes = [
             wavelink.Node(
                 identifier="Meu_Lavalink_Privado",
-                uri="https://meu-lavalink-q57d.onrender.com",  # Removemos a porta :443 explícita para evitar conflito de proxy
+                uri="https://meu-lavalink-q57d.onrender.com",
                 password="youshallnotpass"
             )
         ]
+        # Conecta os nodes ao Wavelink
         await wavelink.Pool.connect(nodes=nodes, client=self.bot, cache_capacity=100)
-            )
-        
+
     @commands.Cog.listener()
     async def on_wavelink_node_ready(self, payload: wavelink.NodeReadyEventPayload):
         print(f"🟢 Lavalink Conectado com Sucesso: {payload.node.identifier}")
@@ -39,13 +46,14 @@ class Music(commands.Cog):
             if player.channel != voice_channel:
                 await player.move_to(voice_channel)
 
+        # Busca a música (padrão SoundCloud)
         tracks = await wavelink.Playable.search(busca, source=wavelink.TrackSource.SoundCloud)
         if not tracks:
             return await interaction.followup.send("❌ Nenhuma música encontrada.")
 
         track = tracks[0]
 
-        if player.playing:
+        if player.playing or not player.queue.is_empty:
             await player.queue.put_wait(track)
             await interaction.followup.send(f"➕ Adicionado à fila: **{track.title}**")
         else:
@@ -55,8 +63,8 @@ class Music(commands.Cog):
     @app_commands.command(name="skip", description="Pula a música atual")
     async def skip(self, interaction: discord.Interaction):
         player: wavelink.Player = interaction.guild.voice_client
-        if player and player.playing:
-            await player.skip()
+        if player and (player.playing or player.paused):
+            await player.skip(force=True)
             await interaction.response.send_message("⏭️ Música pulada!")
         else:
             await interaction.response.send_message("❌ Nenhuma música tocando no momento.")
