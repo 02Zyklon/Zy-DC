@@ -13,12 +13,20 @@ YTDL_OPTIONS = {
     'restrictfilenames': True,
     'noplaylist': True,
     'nocheckcertificate': True,
-    'ignoreerrors': True,
+    'ignoreerrors': False,
     'quiet': True,
     'no_warnings': True,
-    'default_search': 'ytsearch',       # Volta a buscar no YouTube
-    'cookiefile': 'cookies.txt',        # Usa o arquivo cookies.txt da sua pasta
-    'source_address': '0.0.0.0'
+    'default_search': 'ytsearch',
+    'cookiefile': 'cookies.txt',        # Utiliza os cookies presentes na raiz
+    'source_address': '0.0.0.0',
+    # ⚙️ Parâmetros para evitar o erro "page needs to be reloaded":
+    'extractor_retries': 5,            # Força o yt-dlp a tentar novamente se a página pedir reload
+    'dynamic_mpd': False,
+    'http_headers': {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+    }
 }
 
 FFMPEG_OPTIONS = {
