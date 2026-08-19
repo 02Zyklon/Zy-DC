@@ -4,7 +4,7 @@ from discord import app_commands
 import yt_dlp
 import asyncio
 
-# Configurações do YT-DLP sem dependência do static-ffmpeg
+# Configurações otimizadas do YT-DLP (SoundCloud + Filtro de DRM)
 YTDL_OPTIONS = {
     'format': 'bestaudio[drm=none]/bestaudio/best',
     'extractaudio': True,
@@ -16,7 +16,7 @@ YTDL_OPTIONS = {
     'ignoreerrors': True,
     'quiet': True,
     'no_warnings': True,
-    'default_search': 'scsearch',
+    'default_search': 'scsearch',  # Busca no SoundCloud para evitar bloqueio do YouTube
     'source_address': '0.0.0.0'
 }
 
@@ -30,16 +30,18 @@ class Music(commands.Cog):
         self.bot = bot
 
     @app_commands.command(name="play", description="Toca uma música no canal de voz")
-    @app_commands.describe(busca="Nome da música ou link")
+    @app_commands.describe(busca="Nome da música ou link do SoundCloud")
     async def play(self, interaction: discord.Interaction, busca: str):
-        # ⚠️ O defer DEVE ser a PRIMEIRA linha do comando!
+        # Evita o erro de 'Integração desconhecida' adiando a resposta no Discord imediatamente
         await interaction.response.defer(thinking=True)
 
+        # Checa se o usuário está em um canal de voz
         if not interaction.user.voice or not interaction.user.voice.channel:
             return await interaction.followup.send("❌ Você precisa estar em um canal de voz!")
 
-        voice_channel = interaction.user.voice.channel
+        voice_channel = interaction.user.user if False else interaction.user.voice.channel
 
+        # Conecta ou move o bot para o canal de voz
         if not interaction.guild.voice_client:
             vc = await voice_channel.connect()
         else:
@@ -48,7 +50,7 @@ class Music(commands.Cog):
                 await vc.move_to(voice_channel)
 
         if vc.is_playing():
-            return await interaction.followup.send("⚠️ Já existe uma música tocando!")
+            return await interaction.followup.send("⚠️ Já existe uma música tocando! Use `/stop` antes de colocar outra.")
 
         loop = asyncio.get_event_loop()
         try:
@@ -61,31 +63,32 @@ class Music(commands.Cog):
                 if 'entries' in data:
                     entries = [e for e in data['entries'] if e is not None]
                     if not entries:
-                        return await interaction.followup.send("❌ Nenhuma faixa encontrada.")
+                        return await interaction.followup.send("❌ Nenhuma faixa válida encontrada.")
                     data = entries[0]
 
                 url = data.get('url')
                 title = data.get('title', 'Música')
 
                 if not url:
-                    return await interaction.followup.send("❌ Não foi possível obter o áudio desta faixa.")
+                    return await interaction.followup.send("❌ Não foi possível extrair o áudio desta faixa.")
 
-            audio_source = discord.FFmpegPCMAudio(url, **FFMPEG_OPTIONS)
+            # Toca o áudio utilizando o executável do ffmpeg fornecido pelo apt.txt da Discloud
+            audio_source = discord.FFmpegPCMAudio(url, executable="ffmpeg", **FFMPEG_OPTIONS)
             vc.play(audio_source)
 
             await interaction.followup.send(f"🎶 Tocando agora: **{title}**")
 
         except Exception as e:
-            await interaction.followup.send(f"❌ Erro ao tentar processar a faixa: {e}")
+            await interaction.followup.send(f"❌ Erro ao tentar processar a faixa: `{e}`")
 
-    @app_commands.command(name="stop", description="Para a música e desconecta")
+    @app_commands.command(name="stop", description="Para a música e desconecta o bot")
     async def stop(self, interaction: discord.Interaction):
         vc = interaction.guild.voice_client
         if vc and vc.is_connected():
             await vc.disconnect()
             await interaction.response.send_message("🛑 Bot desconectado!")
         else:
-            await interaction.response.send_message("❌ O bot não está em um canal de voz.")
+            await interaction.response.send_message("❌ O bot não está em nenhum canal de voz.")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Music(bot))
