@@ -8,13 +8,13 @@ class Music(commands.Cog):
         self.bot = bot
 
     async def cog_load(self):
-        node = wavelink.Node(
-    identifier="Meu_Lavalink_Privado",
-    uri="wss://meu-lavalink-q57d.onrender.com:443",
-    password="$$$$zyklon$$$"
-     )
+        nodes = [
+            wavelink.Node(
+                identifier="Meu_Lavalink_Privado",
+                uri="wss://meu-lavalink-q57d.onrender.com:443",
+                password="$$$$zyklon$$$"
+            )
         ]
-        # Conecta os nodes ao Wavelink
         await wavelink.Pool.connect(nodes=nodes, client=self.bot, cache_capacity=100)
 
     @commands.Cog.listener()
@@ -38,7 +38,6 @@ class Music(commands.Cog):
             if player.channel != voice_channel:
                 await player.move_to(voice_channel)
 
-        # Busca a música (padrão SoundCloud)
         tracks = await wavelink.Playable.search(busca, source=wavelink.TrackSource.SoundCloud)
         if not tracks:
             return await interaction.followup.send("❌ Nenhuma música encontrada.")
