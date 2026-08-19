@@ -8,14 +8,26 @@ class Music(commands.Cog):
         self.bot = bot
 
     async def cog_load(self):
+        # Cria uma tarefa em background para conectar assim que o bot estiver online no Discord
+        self.bot.loop.create_task(self.connect_nodes())
+
+    async def connect_nodes(self):
+        # Aguarda o bot carregar o ID do usuário/cliente no Discord
+        await self.bot.wait_until_ready()
+
         nodes = [
             wavelink.Node(
                 identifier="Meu-lavalink",
-                uri="https://meu-lavalink-q57d.onrender.com",  # Domínio limpo sem :443
-                password="zyklon123"
+                uri="https://meu-lavalink-q57d.onrender.com",
+                password="zyklon123",
+                retries=10
             )
         ]
-        await wavelink.Pool.connect(nodes=nodes, client=self.bot, cache_capacity=100)
+        
+        try:
+            await wavelink.Pool.connect(nodes=nodes, client=self.bot, cache_capacity=100)
+        except Exception as e:
+            print(f"⚠️ Erro ao conectar ao Lavalink: {e}")
 
     @commands.Cog.listener()
     async def on_wavelink_node_ready(self, payload: wavelink.NodeReadyEventPayload):
@@ -26,13 +38,11 @@ class Music(commands.Cog):
     async def play(self, interaction: discord.Interaction, busca: str):
         await interaction.response.defer(thinking=True)
 
-        # Verifica se o usuário está em um canal de voz
         if not interaction.user.voice or not interaction.user.voice.channel:
             return await interaction.followup.send("❌ Você precisa estar em um canal de voz!")
 
         voice_channel = interaction.user.voice.channel
 
-        # Conecta ou move o bot para o canal de voz
         if not interaction.guild.voice_client:
             player: wavelink.Player = await voice_channel.connect(cls=wavelink.Player)
         else:
@@ -40,14 +50,12 @@ class Music(commands.Cog):
             if player.channel != voice_channel:
                 await player.move_to(voice_channel)
 
-        # Busca a música
         tracks = await wavelink.Playable.search(busca, source=wavelink.TrackSource.SoundCloud)
         if not tracks:
             return await interaction.followup.send("❌ Nenhuma música encontrada.")
 
         track = tracks[0]
 
-        # Adiciona à fila ou toca imediatamente
         if player.playing or not player.queue.is_empty:
             await player.queue.put_wait(track)
             await interaction.followup.send(f"➕ Adicionado à fila: **{track.title}**")
