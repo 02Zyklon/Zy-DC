@@ -3,6 +3,7 @@ from discord.ext import commands
 from discord import app_commands
 import yt_dlp
 import asyncio
+import static_ffmpeg
 
 # Configurações do YT-DLP para extrair o áudio direto
 YTDL_OPTIONS = {
