@@ -17,7 +17,7 @@ class Music(commands.Cog):
 
         nodes = [
             wavelink.Node(
-                identifier="Meu-lavalink",
+                identifier="meu-lavalink",
                 uri="https://meu-lavalink-q57d.onrender.com",
                 password="zyklon123",
                 retries=10
