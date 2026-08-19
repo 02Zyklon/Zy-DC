@@ -12,7 +12,7 @@ class Music(commands.Cog):
             wavelink.Node(
                 identifier="Meu-lavalink",
                 uri="https://meu-lavalink-q57d.onrender.com",  # Domínio limpo sem :443
-                password="$$$$zyklon$$$"
+                password="zyklon123"
             )
         ]
         await wavelink.Pool.connect(nodes=nodes, client=self.bot, cache_capacity=100)
