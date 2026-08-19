@@ -3,14 +3,10 @@ from discord.ext import commands
 from discord import app_commands
 import yt_dlp
 import asyncio
-import static_ffmpeg
 
-# Ativa o ffmpeg no ambiente
-static_ffmpeg.add_paths()
-
-# Configurações otimizadas do YT-DLP ignorando mídias com DRM
+# Configurações do YT-DLP sem dependência do static-ffmpeg
 YTDL_OPTIONS = {
-    'format': 'bestaudio[drm=none]/bestaudio/best',  # Ignora mídias com proteção DRM
+    'format': 'bestaudio[drm=none]/bestaudio/best',
     'extractaudio': True,
     'audioformat': 'mp3',
     'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
@@ -20,7 +16,7 @@ YTDL_OPTIONS = {
     'ignoreerrors': True,
     'quiet': True,
     'no_warnings': True,
-    'default_search': 'scsearch',  # Busca no SoundCloud
+    'default_search': 'scsearch',
     'source_address': '0.0.0.0'
 }
 
@@ -61,18 +57,17 @@ class Music(commands.Cog):
                 if not data:
                     return await interaction.followup.send("❌ Nenhuma música encontrada.")
 
-                # Seleciona a primeira entrada válida caso retorne uma lista de busca
                 if 'entries' in data:
                     entries = [e for e in data['entries'] if e is not None]
                     if not entries:
-                        return await interaction.followup.send("❌ Nenhuma faixa sem proteção DRM encontrada.")
+                        return await interaction.followup.send("❌ Nenhuma faixa encontrada.")
                     data = entries[0]
 
                 url = data.get('url')
                 title = data.get('title', 'Música')
 
                 if not url:
-                    return await interaction.followup.send("❌ Não foi possível obter o link desta faixa (protegida por DRM).")
+                    return await interaction.followup.send("❌ Não foi possível obter o áudio desta faixa.")
 
             audio_source = discord.FFmpegPCMAudio(url, **FFMPEG_OPTIONS)
             vc.play(audio_source)
