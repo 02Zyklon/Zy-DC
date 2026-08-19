@@ -10,11 +10,12 @@ class Music(commands.Cog):
     async def cog_load(self):
         nodes = [
             wavelink.Node(
-                identifier="Meu-lavalink",
-                uri="wss://meu-lavalink-q57d.onrender.com:443",
+                identifier="Meu_Lavalink_Privado",
+                uri="https://meu-lavalink-q57d.onrender.com:443",
                 password="$$$$zyklon$$$"
             )
         ]
+        # Conecta ao servidor Lavalink
         await wavelink.Pool.connect(nodes=nodes, client=self.bot, cache_capacity=100)
 
     @commands.Cog.listener()
@@ -26,11 +27,13 @@ class Music(commands.Cog):
     async def play(self, interaction: discord.Interaction, busca: str):
         await interaction.response.defer(thinking=True)
 
+        # Verifica se o usuário está em um canal de voz
         if not interaction.user.voice or not interaction.user.voice.channel:
             return await interaction.followup.send("❌ Você precisa estar em um canal de voz!")
 
         voice_channel = interaction.user.voice.channel
-        
+
+        # Conecta ou move o bot para o canal de voz
         if not interaction.guild.voice_client:
             player: wavelink.Player = await voice_channel.connect(cls=wavelink.Player)
         else:
@@ -38,12 +41,14 @@ class Music(commands.Cog):
             if player.channel != voice_channel:
                 await player.move_to(voice_channel)
 
+        # Busca a música
         tracks = await wavelink.Playable.search(busca, source=wavelink.TrackSource.SoundCloud)
         if not tracks:
             return await interaction.followup.send("❌ Nenhuma música encontrada.")
 
         track = tracks[0]
 
+        # Adiciona à fila ou toca imediatamente
         if player.playing or not player.queue.is_empty:
             await player.queue.put_wait(track)
             await interaction.followup.send(f"➕ Adicionado à fila: **{track.title}**")
@@ -60,7 +65,7 @@ class Music(commands.Cog):
         else:
             await interaction.response.send_message("❌ Nenhuma música tocando no momento.")
 
-    @app_commands.command(name="stop", description="Para a música e desconecta")
+    @app_commands.command(name="stop", description="Para a música e desconecta o bot")
     async def stop(self, interaction: discord.Interaction):
         player: wavelink.Player = interaction.guild.voice_client
         if player:
