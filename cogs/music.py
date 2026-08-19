@@ -1,10 +1,3 @@
-Seu código tinha um erro de sintaxe (um fechamento de parênteses ) sobrando logo após a chamada do Pool.connect dentro do cog_load), o que faria o bot quebrar logo ao carregar o Cog.
-
-Além disso, ajustei alguns detalhes no comando de skip e no tratamento de filas do Wavelink v3.
-
-Aqui está o código 100% corrigido e limpo:
-
-Python
 import discord
 from discord.ext import commands
 from discord import app_commands
