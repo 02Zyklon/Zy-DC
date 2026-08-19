@@ -6,6 +6,7 @@ import asyncio
 
 # Configurações do yt-dlp para extrair apenas o áudio com melhor qualidade
 YTDL_OPTIONS = {
+    'cookiefile': 'cookies.txt',
     'format': 'bestaudio/best',
     'extractaudio': True,
     'audioformat': 'mp3',
