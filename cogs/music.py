@@ -8,12 +8,11 @@ class Music(commands.Cog):
         self.bot = bot
 
     async def cog_load(self):
-        nodes = [
-            wavelink.Node(
-                identifier="Meu_Lavalink_Privado",
-                uri="https://meu-lavalink-q57d.onrender.com",
-                password="$$$$zyklon$$$"
-            )
+        node = wavelink.Node(
+    identifier="Meu_Lavalink_Privado",
+    uri="wss://meu-lavalink-q57d.onrender.com:443",
+    password="$$$$zyklon$$$"
+     )
         ]
         # Conecta os nodes ao Wavelink
         await wavelink.Pool.connect(nodes=nodes, client=self.bot, cache_capacity=100)
