@@ -6,7 +6,7 @@ import asyncio
 
 # Configurações otimizadas do YT-DLP (SoundCloud + Filtro de DRM)
 YTDL_OPTIONS = {
-    'format': 'bestaudio[drm=none]/bestaudio/best',
+    'format': 'bestaudio/best',
     'extractaudio': True,
     'audioformat': 'mp3',
     'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
@@ -16,7 +16,8 @@ YTDL_OPTIONS = {
     'ignoreerrors': True,
     'quiet': True,
     'no_warnings': True,
-    'default_search': 'scsearch',  # Busca no SoundCloud para evitar bloqueio do YouTube
+    'default_search': 'ytsearch',       # Volta a buscar no YouTube
+    'cookiefile': 'cookies.txt',        # Usa o arquivo cookies.txt da sua pasta
     'source_address': '0.0.0.0'
 }
 
