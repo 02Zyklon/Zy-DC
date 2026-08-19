@@ -19,7 +19,7 @@ class Music(commands.Cog):
             wavelink.Node(
                 identifier="Meu_Lavalink_Privado",
                 uri="https://meu-lavalink-q57d.onrender.com",
-                password="youshallnotpass"
+                password="$$$$zyklon$$$"
             )
         ]
         # Conecta os nodes ao Wavelink
