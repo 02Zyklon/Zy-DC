@@ -12,5 +12,5 @@ yt-dlp
 PyNaCl
 davey
 spotipy
-wavelink
+wavelink>=3.0.0
 static-ffmpeg
