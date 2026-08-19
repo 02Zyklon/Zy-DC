@@ -11,12 +11,13 @@ class Music(commands.Cog):
         nodes = [
             wavelink.Node(
                 identifier="Meu_Lavalink_Privado",
-                uri="https://meu-lavalink-q57d.onrender.com:443",
-                password="youshallnotpass"  # Se você alterou a senha no application.yml, coloque a sua aqui
+                uri="https://meu-lavalink-q57d.onrender.com",  # Removemos a porta :443 explícita para evitar conflito de proxy
+                password="youshallnotpass"
             )
         ]
         await wavelink.Pool.connect(nodes=nodes, client=self.bot, cache_capacity=100)
-
+            )
+        
     @commands.Cog.listener()
     async def on_wavelink_node_ready(self, payload: wavelink.NodeReadyEventPayload):
         print(f"🟢 Lavalink Conectado com Sucesso: {payload.node.identifier}")
