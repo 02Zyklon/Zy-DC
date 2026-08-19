@@ -31,12 +31,13 @@ class Music(commands.Cog):
         self.bot = bot
 
     @app_commands.command(name="play", description="Toca uma música no canal de voz")
-    @app_commands.describe(busca="Nome da música ou link do SoundCloud")
+    @app_commands.describe(busca="Nome da música ou link")
     async def play(self, interaction: discord.Interaction, busca: str):
-        # Evita o erro de 'Integração desconhecida' adiando a resposta no Discord imediatamente
+        # ⚠️ ESTA DEVE SER A PRIMEIRA LINHA!
+        # Avisa o Discord imediatamente que o bot está processando ("Pensando...")
         await interaction.response.defer(thinking=True)
 
-        # Checa se o usuário está em um canal de voz
+        # A partir daqui o bot ganha até 15 minutos para processar o áudio sem dar erro
         if not interaction.user.voice or not interaction.user.voice.channel:
             return await interaction.followup.send("❌ Você precisa estar em um canal de voz!")
 
