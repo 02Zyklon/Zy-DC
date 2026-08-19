@@ -17,8 +17,17 @@ YTDL_OPTIONS = {
     'logtostderr': False,
     'quiet': True,
     'no_warnings': True,
-    'default_search': 'auto',
+    'default_search': 'ytsearch',  # Mantém a busca padronizada
     'source_address': '0.0.0.0',
+    # --- BURLAR O BLOQUEIO DE BOT ---
+    'nocheckwebpage': True,
+    'youtube_include_dash_manifest': False,
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'web'], # Utiliza o cliente mobile do Android que ignora o PoToken
+            'skip': ['hls', 'dash']
+        }
+    }
 }
 
 # Configurações do FFmpeg para otimização do streaming de voz
