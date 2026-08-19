@@ -11,6 +11,4 @@ yt-dlp
 PyNaCl
 davey
 spotipy
-yt-dlp
-yt-dlp-get-pot
-yt-dlp>=2025.1.1
+wavelink
