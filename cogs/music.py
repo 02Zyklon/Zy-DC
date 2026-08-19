@@ -7,17 +7,12 @@ class Music(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    async def cog_load(self):
+  async def cog_load(self):
         nodes = [
             wavelink.Node(
-                identifier="Node_SSL_1",
-                uri="https://lavalink.vost.pt:443",
-                password="youshallnotpass"
-            ),
-            wavelink.Node(
-                identifier="Node_SSL_2",
-                uri="https://ssl.lavalink.vost.pt:443",
-                password="youshallnotpass"
+                identifier="Meu_Lavalink_Privado",
+                uri="https://meu-lavalink-q57d.onrender.com:443",
+                password="youshallnotpass"  # Se você alterou a senha no application.yml, coloque a sua aqui
             )
         ]
         await wavelink.Pool.connect(nodes=nodes, client=self.bot, cache_capacity=100)
