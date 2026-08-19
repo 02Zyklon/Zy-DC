@@ -10,13 +10,13 @@ class Music(commands.Cog):
     async def cog_load(self):
         nodes = [
             wavelink.Node(
-                identifier="Node_Principal",
-                uri="https://lava-v3.ajiepy.srht.site:443", 
-                password="https://discord.gg/ajiepy"
+                identifier="Node_Koyeb",
+                uri="https://lavalink-v3.koyeb.app:443",
+                password="youshallnotpass"
             ),
             wavelink.Node(
-                identifier="Node_Reserva",
-                uri="https://lavalink.lavalink.me:443",
+                identifier="Node_Lava1",
+                uri="https://lavalink.jirayu.net:443",
                 password="youshallnotpass"
             )
         ]
@@ -24,7 +24,7 @@ class Music(commands.Cog):
 
     @commands.Cog.listener()
     async def on_wavelink_node_ready(self, payload: wavelink.NodeReadyEventPayload):
-        print(f"🟢 Lavalink Conectado: {payload.node.identifier}")
+        print(f"🟢 Lavalink Conectado com Sucesso: {payload.node.identifier}")
 
     @app_commands.command(name="play", description="Toca uma música no canal de voz")
     @app_commands.describe(busca="Nome da música ou link")
