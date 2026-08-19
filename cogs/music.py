@@ -7,7 +7,7 @@ class Music(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-  async def cog_load(self):
+    async def cog_load(self):
         nodes = [
             wavelink.Node(
                 identifier="Meu_Lavalink_Privado",
