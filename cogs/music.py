@@ -3,10 +3,6 @@ from discord.ext import commands
 from discord import app_commands
 import yt_dlp
 import asyncio
-import static_ffmpeg
-
-# ⚡ Garante que o FFmpeg seja baixado e configurado automaticamente pelo Python!
-static_ffmpeg.add_paths()
 
 YTDL_OPTIONS = {
     'format': 'bestaudio/best',
