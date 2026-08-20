@@ -112,8 +112,6 @@ COMANDOS_INICIAIS_PADRAO = {
     }
 }
 
-}
-
 def load_json(file_path, default):
     if not os.path.exists(file_path):
         if file_path == DB_AJUDA:
