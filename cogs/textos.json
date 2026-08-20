@@ -1,0 +1,15 @@
+{
+  "termo": [
+    "DADOS", "PODER", "JOGOS", "CORDA", "FOGO", "TERRA", "GRUPO", "TERMO", "NOITE", "MUNDO"
+  ],
+  "forca": {
+    "programacao": ["PYTHON", "JAVASCRIPT", "DISCORD", "CODIGO", "ALGORITMO"],
+    "games": ["MINECRAFT", "VALORANT", "FORTNITE", "FREEFIRE", "POKEMON"],
+    "geral": ["BRASIL", "MUSA", "CARRO", "COMPUTADOR", "LAVANDERIA"]
+  },
+  "quiz": [
+    {"p": "Qual é a linguagem principal deste bot?", "r": "python"},
+    {"p": "Qual o planeta mais próximo do Sol?", "r": "mercurio"},
+    {"p": "Em que ano o Free Fire foi lançado?", "r": "2017"}
+  ]
+}
