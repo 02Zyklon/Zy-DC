@@ -11,3 +11,4 @@ google-genai
 openai
 aiofiles
 spotipy
+akinator.py
