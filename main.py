@@ -1080,14 +1080,28 @@ async def main():
         except Exception as e:
             print(f"⚠️ Erro ao carregar 'pet_rpg': {e}")
 
-        # 2. Carrega a Cog de Música (music.py dentro de cogs/)
+        # 2. Carrega a Cog de Música
         try:
             await bot.load_extension("cogs.music")
             print("🟢 Cog 'cogs.music' carregada!")
         except Exception as e:
             print(f"⚠️ Erro ao carregar 'cogs.music': {e}")
+
+        # 3. Carrega a Cog de Jogos
+        try:
+            await bot.load_extension("cogs.jogos")
+            print("🟢 Cog 'cogs.jogos' carregada!")
+        except Exception as e:
+            print(f"⚠️ Erro ao carregar 'cogs.jogos': {e}")
+
+        # 4. Carrega a Cog de Gacha
+        try:
+            await bot.load_extension("cogs.gacha")
+            print("🟢 Cog 'cogs.gacha' carregada!")
+        except Exception as e:
+            print(f"⚠️ Erro ao carregar 'cogs.gacha': {e}")
         
-        # 3. Inicia o bot
+        # 5. Inicia o bot
         await bot.start(token)
 
 if __name__ == "__main__":
