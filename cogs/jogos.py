@@ -434,12 +434,8 @@ class Jogos(commands.Cog):
 
         await interaction.response.send_message(f"Você: `{user_choice}` vs Bot: `{bot_choice}`\n{res}")
 
-    # 9. CARA OU COROA
-    @app_commands.command(name="moeda", description="Jogue uma moeda.")
-    async def moeda(self, interaction: discord.Interaction):
-        resultado = random.choice(["Cara 🪙", "Coroa 👑"])
-        await interaction.response.send_message(f"🪙 A moeda caiu em: **{resultado}**!")
-
+    # Anulado. 
+    
     # # 10. ADIVINHAÇÃO
     @app_commands.command(name="adivinhe", description="Tente adivinhar o número de 1 a 100.")
     async def adivinhe(self, interaction: discord.Interaction):
