@@ -51,13 +51,18 @@ CATEGORIAS_VALIDAS = [
 ]
 
 COMANDOS_INICIAIS_PADRAO = {
-    "🐾 Sistema de Pets & RPG": {
+    "🎮 Jogos & Mini-Games": {
         "/daily": "Coleta sua recompensa diária de Golds.",
         "/foguinho": "Aposte e tente multiplicar seus Golds sem explodir.",
         "/masmorra": "Enfrente monstros nas profundezas por recompensas.",
         "/pet": "Cuide do seu companheiro de batalha.",
         "/explorar": "Explora biomas perigosos (Requer Nível 20+).",
-        "/velha": "Desafie outro membro para um X1 de Jogo da Velha."
+        "/velha": "Desafie outro membro para um X1 de Jogo da Velha.",
+        "/akinator": "Inicia um jogo interativo com o Akinator para adivinhar seu personagem.",
+        "/ppt": "Desafie a IA para uma partida de Pedra, Papel ou Tesoura.",
+        "/dado": "Rola um dado virtual de 6 a 100 lados.",
+        "/caracoroa": "Aposte Golds no cara ou coroa contra o bot.",
+        "/roleta": "Gire a roleta da sorte para tentar ganhar Golds."
     },
     "💰 Economia & Carteira": {
         "/carteira": "Consulte o seu saldo atual de Golds.",
@@ -105,6 +110,8 @@ COMANDOS_INICIAIS_PADRAO = {
         "/renomear_canal": "Altera o nome de um canal para um novo formato/decorado.",
         "/adc_comando": "[ADMIN] Adiciona um novo comando dinamicamente ao menu."
     }
+}
+
 }
 
 def load_json(file_path, default):
