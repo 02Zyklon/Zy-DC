@@ -7,6 +7,7 @@ import datetime
 import json
 import os
 import akinator as aki
+import economy
 
 # --- CARREGAMENTO DINÂMICO DE TEXTOS (textos.json) ---
 def carregar_textos():
@@ -34,17 +35,6 @@ def carregar_textos():
         }
 
 TEXTOS = carregar_textos()
-
-# --- MOCK / INTEGRAÇÃO DE ECONOMIA (SALDO EM GOLDS) ---
-# Substitua estas funções pela chamada real do seu banco de dados
-SALDOS_MOCK = {}
-
-def get_saldo(user_id: int) -> int:
-    return SALDOS_MOCK.get(user_id, 500)
-
-def update_saldo(user_id: int, valor: int):
-    saldo_atual = get_saldo(user_id)
-    SALDOS_MOCK[user_id] = max(0, saldo_atual + valor)
 
 
 # ==========================================
@@ -183,9 +173,9 @@ class BlackjackView(discord.ui.View):
         self.mao_jogador.append(self.baralho.pop())
         pts = self.calcular_pontos(self.mao_jogador)
         if pts > 21:
-            update_saldo(self.user_id, -self.aposta)
+            economy.remove_gold(self.user_id, self.aposta)
             embed = self.gerar_embed(final=True)
-            embed.description = f"💥 **Estourou!** Você fez {pts} pontos e perdeu **{self.aposta} Golds**."
+            embed.description = f"💥 **Estourou!** Você fez {pts} pontos e perdeu **{self.aposta:,} Golds**."
             for item in self.children: item.disabled = True
             await interaction.response.edit_message(embed=embed, view=self)
             self.stop()
@@ -202,11 +192,11 @@ class BlackjackView(discord.ui.View):
 
         embed = self.gerar_embed(final=True)
         if pts_d > 21 or pts_j > pts_d:
-            update_saldo(self.user_id, self.aposta)
-            embed.description = f"🏆 **Você Venceu!** Ganhou **{self.aposta} Golds**."
+            economy.add_gold(self.user_id, self.aposta)
+            embed.description = f"🏆 **Você Venceu!** Ganhou **{self.aposta:,} Golds**."
         elif pts_j < pts_d:
-            update_saldo(self.user_id, -self.aposta)
-            embed.description = f"💀 **O Bot Venceu!** Você perdeu **{self.aposta} Golds**."
+            economy.remove_gold(self.user_id, self.aposta)
+            embed.description = f"💀 **O Bot Venceu!** Você perdeu **{self.aposta:,} Golds**."
         else:
             embed.description = "⚖️ **Empate!** Seus Golds foram devolvidos."
 
@@ -358,9 +348,9 @@ class Jogos(commands.Cog):
             await interaction.response.send_message("❌ A aposta precisa ser maior que zero!", ephemeral=True)
             return
 
-        saldo = get_saldo(interaction.user.id)
+        saldo = economy.get_gold(interaction.user.id)
         if saldo < aposta:
-            await interaction.response.send_message(f"❌ Você não tem Golds suficientes. Saldo atual: `{saldo}`", ephemeral=True)
+            await interaction.response.send_message(f"❌ Você não tem Golds suficientes. Saldo atual: `{saldo:,}` Golds", ephemeral=True)
             return
 
         view = BlackjackView(interaction.user.id, aposta)
@@ -381,8 +371,13 @@ class Jogos(commands.Cog):
     # 6. CAÇA-NÍQUEIS
     @app_commands.command(name="slots", description="Aposte Golds no Caça-Níqueis.")
     async def slots(self, interaction: discord.Interaction, aposta: int):
-        if aposta <= 0 or get_saldo(interaction.user.id) < aposta:
-            await interaction.response.send_message("❌ Saldo insuficiente ou aposta inválida!", ephemeral=True)
+        if aposta <= 0:
+            await interaction.response.send_message("❌ A aposta precisa ser maior que zero!", ephemeral=True)
+            return
+
+        saldo = economy.get_gold(interaction.user.id)
+        if saldo < aposta:
+            await interaction.response.send_message(f"❌ Saldo insuficiente! Saldo atual: `{saldo:,}` Golds", ephemeral=True)
             return
 
         emojis = ["🍒", "🍋", "🔔", "🎰", "💎"]
@@ -390,15 +385,15 @@ class Jogos(commands.Cog):
 
         if r1 == r2 == r3:
             ganho = aposta * 3
-            update_saldo(interaction.user.id, ganho)
-            res = f"🎉 **JACKPOT!** Ganhou **{ganho} Golds**!"
+            economy.add_gold(interaction.user.id, ganho)
+            res = f"🎉 **JACKPOT!** Ganhou **{ganho:,} Golds**!"
         elif r1 == r2 or r2 == r3 or r1 == r3:
             ganho = int(aposta * 1.5)
-            update_saldo(interaction.user.id, ganho)
-            res = f"✨ **Dupla!** Ganhou **{ganho} Golds**!"
+            economy.add_gold(interaction.user.id, ganho)
+            res = f"✨ **Dupla!** Ganhou **{ganho:,} Golds**!"
         else:
-            update_saldo(interaction.user.id, -aposta)
-            res = f"💀 Perdeu **{aposta} Golds**."
+            economy.remove_gold(interaction.user.id, aposta)
+            res = f"💀 Perdeu **{aposta:,} Golds**."
 
         await interaction.response.send_message(f"🎰 | [ {r1} | {r2} | {r3} ]\n{res}")
 
@@ -434,9 +429,7 @@ class Jogos(commands.Cog):
 
         await interaction.response.send_message(f"Você: `{user_choice}` vs Bot: `{bot_choice}`\n{res}")
 
-    # Anulado. 
-    
-    # # 10. ADIVINHAÇÃO
+    # 10. ADIVINHAÇÃO
     @app_commands.command(name="adivinhe", description="Tente adivinhar o número de 1 a 100.")
     async def adivinhe(self, interaction: discord.Interaction):
         numero = random.randint(1, 100)
