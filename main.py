@@ -5,37 +5,15 @@ import json
 import logging
 import discord
 import aiohttp
+from datetime import datetime, timedelta
 from discord.ext import commands
 from discord import app_commands
 from keep_alive import keep_alive
 import economy
 
-from datetime import datetime, timedelta
-
-DB_RPG = "config_rpg.json"
-
-def obter_pet_com_buffs(user_id: str, dados_rpg: dict):
-    pet = dados_rpg.get("pets", {}).get(user_id)
-    if not pet:
-        return None
-
-    # Inicializa chaves caso não existam no JSON antigo
-    pet.setdefault("sorte_bonus", 0.0)
-    pet.setdefault("bonus_xp", 1.0)
-    pet.setdefault("buff_expira_em", None)
-
-    # Verifica se o tempo do buff acabou
-    if pet["buff_expira_em"]:
-        data_expira = datetime.fromisoformat(pet["buff_expira_em"])
-        if datetime.now() > data_expira:
-            pet["sorte_bonus"] = 0.0
-            pet["bonus_xp"] = 1.0
-            pet["buff_expira_em"] = None
-            save_json(DB_RPG, dados_rpg)
-
-    return pet
-    
-# Configura logs visíveis em tempo real no Discloud
+# =========================================================
+# CONFIGURAÇÃO DE LOGS
+# =========================================================
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -43,27 +21,11 @@ logging.basicConfig(
 )
 
 # =========================================================
-# CONFIGURAÇÃO E INICIALIZAÇÃO
+# BANCO DE DADOS LOCAL (JSON) E UTILITÁRIOS
 # =========================================================
-from google import genai
-from openai import OpenAI
-
-# Inicializa os clientes das IAs lendo as chaves do ambiente
-gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY")) if os.getenv("GEMINI_API_KEY") else None
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if os.getenv("OPENAI_API_KEY") else None
-
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
-
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-# ID do seu servidor no Discord (Guild)
-GUILD_ID = 1434359569718706320
-
-# Arquivos de armazenamento JSON
 DB_REGISTRO = "config_registro.json"
 DB_AJUDA = "ajuda_config.json"
+DB_RPG = "config_rpg.json"
 
 CATEGORIAS_VALIDAS = [
     "🎮 Jogos & Mini-Games",
@@ -142,29 +104,68 @@ def load_json(file_path, default):
             save_json(DB_AJUDA, COMANDOS_INICIAIS_PADRAO)
             return COMANDOS_INICIAIS_PADRAO
         return default
-    with open(file_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logging.error(f"Erro ao carregar {file_path}: {e}")
+        return default
 
 def save_json(file_path, data):
-    with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        logging.error(f"Erro ao salvar {file_path}: {e}")
+
+def obter_pet_com_buffs(user_id: str, dados_rpg: dict):
+    pet = dados_rpg.get("pets", {}).get(user_id)
+    if not pet:
+        return None
+
+    pet.setdefault("sorte_bonus", 0.0)
+    pet.setdefault("bonus_xp", 1.0)
+    pet.setdefault("buff_expira_em", None)
+
+    if pet["buff_expira_em"]:
+        data_expira = datetime.fromisoformat(pet["buff_expira_em"])
+        if datetime.now() > data_expira:
+            pet["sorte_bonus"] = 0.0
+            pet["bonus_xp"] = 1.0
+            pet["buff_expira_em"] = None
+            save_json(DB_RPG, dados_rpg)
+
+    return pet
+
+# =========================================================
+# CONFIGURAÇÃO DE IA E BOT DISCORD
+# =========================================================
+from google import genai
+from openai import OpenAI
+
+gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY")) if os.getenv("GEMINI_API_KEY") else None
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if os.getenv("OPENAI_API_KEY") else None
+
+intents = discord.Intents.default()
+intents.message_content = True
+intents.members = True
+
+bot = commands.Bot(command_prefix="!", intents=intents)
+GUILD_ID = 1434359569718706320
 
 @bot.event
 async def on_ready():
-    # Sincroniza a árvore de comandos globalmente ao ligar
     try:
         synced = await bot.tree.sync()
-        print(f"🌐 Sincronizados {len(synced)} comandos Slash globalmente!")
+        logging.info(f"🌐 Sincronizados {len(synced)} comandos Slash globalmente!")
     except Exception as e:
-        print(f"⚠️ Erro ao sincronizar comandos: {e}")
+        logging.error(f"⚠️ Erro ao sincronizar comandos: {e}")
     
-    # Tornar as Views persistentes (não somem/quebram ao reiniciar)
     bot.add_view(PainelTicketView())
     bot.add_view(BotaoFecharTicket())
     bot.add_view(ViewBotaoComprar())
     
-    print(f"🤖 Bot online e sincronizado com sucesso como: {bot.user}")
-
+    logging.info(f"🤖 Bot online e sincronizado com sucesso como: {bot.user}")
 
 # =========================================================
 # ⚡ COMANDO DE SINCRONIZAÇÃO DINÂMICA
@@ -180,9 +181,8 @@ async def sync(ctx: commands.Context, spec: str = None):
         synced = await bot.tree.sync()
         await ctx.send(f"🌐 **{len(synced)}** comandos sincronizados globalmente!")
 
-
 # =========================================================
-# 🛒 SISTEMA DE VENDAS & TICKET INDIVIDUAL POR CANAL
+# 🛒 SISTEMA DE VENDAS & TICKET INDIVIDUAL
 # =========================================================
 class BotaoComprar(discord.ui.Button):
     def __init__(self):
@@ -235,12 +235,10 @@ class BotaoComprar(discord.ui.Button):
         await canal_ticket.send(content=f"{user.mention}", embed=embed_ticket, view=BotaoFecharTicket())
         await interaction.response.send_message(f"✅ Ticket criado com sucesso! Acesse: {canal_ticket.mention}", ephemeral=True)
 
-
 class ViewBotaoComprar(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(BotaoComprar())
-
 
 @bot.tree.command(name="fixar_produto", description="📌 Envia a imagem e detalhes do produto com o botão de ticket.")
 @app_commands.checks.has_permissions(administrator=True)
@@ -262,7 +260,6 @@ async def fixar_produto(
     await interaction.channel.send(embed=embed, view=ViewBotaoComprar())
     await interaction.followup.send("✅ Anúncio do produto fixado com sucesso neste canal!", ephemeral=True)
 
-
 # =========================================================
 # 🪙 SISTEMA DE GOLDS (ECONOMIA CONECTADA AO economy.py)
 # =========================================================
@@ -280,7 +277,6 @@ async def carteira(interaction: discord.Interaction, usuario: discord.Member = N
     embed.add_field(name="💰 Saldo em Golds", value=f"`{saldo:,}` 📀", inline=False)
     await interaction.response.send_message(embed=embed)
 
-
 @bot.tree.command(name="pay", description="Transfira Golds para outro usuário.")
 async def pay(interaction: discord.Interaction, destino: discord.Member, quantia: int):
     if quantia <= 0 or destino.bot or destino.id == interaction.user.id:
@@ -291,7 +287,6 @@ async def pay(interaction: discord.Interaction, destino: discord.Member, quantia
 
     economy.add_gold(destino.id, quantia)
     await interaction.response.send_message(f"💸 **{interaction.user.mention}** enviou **{quantia:,}** Golds 📀 para **{destino.mention}**!")
-
 
 @bot.tree.command(name="rank", description="🏆 Exibe o TOP 10 dos membros mais ricos do servidor.")
 async def rank(interaction: discord.Interaction):
@@ -327,8 +322,6 @@ async def rank(interaction: discord.Interaction):
     except Exception as e:
         await interaction.followup.send(f"❌ Ocorreu um erro ao carregar o rank: `{e}`")
 
-
-
 # =========================================================
 # 🔐 SISTEMA DE REGISTRO POR PALAVRA-PASSE
 # =========================================================
@@ -340,7 +333,6 @@ async def set_chat_filtracao(interaction: discord.Interaction, canal: discord.Te
     save_json(DB_REGISTRO, cfg)
     await interaction.response.send_message(f"✅ Canal de filtração definido para: {canal.mention}")
 
-
 @bot.tree.command(name="set_passe_cargo", description="[ADMIN] Registra palavra-passe para um cargo.")
 @app_commands.checks.has_permissions(administrator=True)
 async def set_passe_cargo(interaction: discord.Interaction, palavra_passe: str, cargo: discord.Role):
@@ -348,7 +340,6 @@ async def set_passe_cargo(interaction: discord.Interaction, palavra_passe: str, 
     cfg["palavras"][palavra_passe.lower()] = cargo.id
     save_json(DB_REGISTRO, cfg)
     await interaction.response.send_message(f"✅ Palavra-passe `{palavra_passe.lower()}` associada ao cargo **{cargo.name}**.")
-
 
 @bot.event
 async def on_member_join(member: discord.Member):
@@ -359,11 +350,9 @@ async def on_member_join(member: discord.Member):
         if canal:
             await canal.send(f"👋 Bem-vindo(a) {member.mention}! Digite a **palavra-passe** de acesso aqui no chat para liberar seu cargo.")
 
-
 @bot.event
 async def on_app_command_completion(interaction: discord.Interaction, command: app_commands.Command):
-    print(f"📌 [COMANDO EXECUTADO] /{command.name} por {interaction.user} (ID: {interaction.user.id})", flush=True)
-
+    logging.info(f"📌 [COMANDO EXECUTADO] /{command.name} por {interaction.user} (ID: {interaction.user.id})")
 
 @bot.event
 async def on_message(message: discord.Message):
@@ -399,7 +388,6 @@ async def on_message(message: discord.Message):
         except discord.Forbidden:
             pass
 
-
 # ==========================================
 # 🎫 SISTEMA DE TICKETS GENERALIZADO
 # ==========================================
@@ -412,7 +400,6 @@ class BotaoFecharTicket(discord.ui.View):
         await interaction.response.send_message("🔒 Este ticket será apagado em **5 segundos**...", ephemeral=True)
         await asyncio.sleep(5)
         await interaction.channel.delete()
-
 
 class MenuOpcoesTicket(discord.ui.Select):
     def __init__(self):
@@ -457,12 +444,10 @@ class MenuOpcoesTicket(discord.ui.Select):
         await canal_ticket.send(embed=embed_ticket, view=BotaoFecharTicket())
         await interaction.response.send_message(f"✅ Seu ticket foi criado em {canal_ticket.mention}!", ephemeral=True)
 
-
 class PainelTicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(MenuOpcoesTicket())
-
 
 @bot.tree.command(name="painelticket", description="Envia o painel fixo de abertura de tickets no canal")
 @app_commands.checks.has_permissions(administrator=True)
@@ -475,12 +460,10 @@ async def painelticket(interaction: discord.Interaction):
     embed.set_footer(text="Zy-Bot • Sistema de Atendimento Automático")
     await interaction.response.send_message(embed=embed, view=PainelTicketView())
 
-
-
 # ==========================================
-# 🛠️ UTILITÁRIOS
+# 🛠️ UTILITÁRIOS E COMANDO DAR SORTE (CORRIGIDO)
 # ==========================================
-@app_commands.command(name="darsorte", description="Aplica um buff temporário de sorte e bônus de XP a um jogador.")
+@bot.tree.command(name="darsorte", description="Aplica um buff temporário de sorte e bônus de XP a um jogador.")
 @app_commands.checks.has_permissions(administrator=True)
 async def darsorte(
     interaction: discord.Interaction, 
@@ -491,22 +474,21 @@ async def darsorte(
 ):
     await interaction.response.defer(ephemeral=True)
 
-    db = load_rpg_db()
+    db = load_json(DB_RPG, {"pets": {}})
     user_id = str(usuario.id)
 
-    if user_id not in db["pets"]:
+    if user_id not in db.get("pets", {}):
         return await interaction.followup.send("❌ Esse usuário não possui um pet cadastrado!", ephemeral=True)
 
     pet = db["pets"][user_id]
     
-    # Define a data de expiração usando 'days'
-    data_expiracao = datetime.datetime.now() + datetime.timedelta(days=dias)
+    data_expiracao = datetime.now() + timedelta(days=dias)
     
     pet["sorte_bonus"] = sorte
     pet["bonus_xp"] = bonus_xp
     pet["buff_expira_em"] = data_expiracao.isoformat()
 
-    save_rpg_db(db)
+    save_json(DB_RPG, db)
 
     embed = discord.Embed(
         title="🍀 Buff Aplicado com Sucesso!",
@@ -519,15 +501,13 @@ async def darsorte(
         color=discord.Color.green()
     )
     
-    # Parêntese devidamente fechado ao final da chamada
     await interaction.followup.send(embed=embed, ephemeral=True)
-    
+
 @bot.tree.command(name="ping", description="Verifica a latência do bot")
 async def ping(interaction: discord.Interaction):
     await interaction.response.defer()
     ms = round(bot.latency * 1000)
     await interaction.followup.send(f"🏓 Pong! Latência atual: **{ms}ms**")
-
 
 @bot.tree.command(name="userinfo", description="Exibe informações de um membro")
 async def userinfo(interaction: discord.Interaction, membro: discord.Member = None):
@@ -544,7 +524,6 @@ async def userinfo(interaction: discord.Interaction, membro: discord.Member = No
     embed.set_thumbnail(url=alvo.display_avatar.url)
     
     await interaction.followup.send(embed=embed)
-
 
 @bot.tree.command(name="serverinfo", description="Exibe detalhes do servidor")
 async def serverinfo(interaction: discord.Interaction):
@@ -589,7 +568,6 @@ async def adc_comando(interaction: discord.Interaction, categoria: app_commands.
         ephemeral=True
     )
 
-
 # ==========================================
 # 📚 MENU DE AJUDA INTERATIVO DINÂMICO
 # ==========================================
@@ -597,7 +575,6 @@ class AjudaView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=180)
 
-        # Mapeamento de emojis e descrições visuais para o menu
         icones_e_descricoes = {
             "🎮 Jogos & Mini-Games": ("🎮", "Comandos de RPG, mini-games, apostas e diversão."),
             "💰 Economia & Carteira": ("💳", "Comandos de saldo, pagamentos e rank de golds."),
@@ -624,7 +601,6 @@ class AjudaView(discord.ui.View):
         self.add_item(select_menu)
 
     async def selecionar_categoria(self, interaction: discord.Interaction):
-        # Pega a opção selecionada no menu
         opcao = interaction.data["values"][0]
         
         dados_ajuda = load_json(DB_AJUDA, {})
@@ -670,7 +646,6 @@ async def ajuda(interaction: discord.Interaction):
     view = AjudaView()
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-
 @bot.tree.command(name="avatar", description="Manda o avatar de um membro")
 async def avatar(interaction: discord.Interaction, membro: discord.Member = None):
     await interaction.response.defer()
@@ -678,7 +653,6 @@ async def avatar(interaction: discord.Interaction, membro: discord.Member = None
     embed = discord.Embed(title=f"🖼️ Avatar de {alvo.name}", color=discord.Color.dark_theme())
     embed.set_image(url=alvo.display_avatar.url)
     await interaction.followup.send(embed=embed)
-
 
 @bot.tree.command(name="embed", description="Cria uma mensagem formatada (Embed)")
 @app_commands.checks.has_permissions(manage_messages=True)
@@ -692,7 +666,6 @@ async def embed(interaction: discord.Interaction, titulo: str, conteudo: str, co
     await interaction.channel.send(embed=embed_msg)
     await interaction.followup.send("✅ Embed enviada!", ephemeral=True)
 
-
 @bot.tree.command(name="enquete", description="Abre uma votação com reações")
 async def enquete(interaction: discord.Interaction, pergunta: str):
     await interaction.response.defer()
@@ -701,14 +674,12 @@ async def enquete(interaction: discord.Interaction, pergunta: str):
     await mensagem.add_reaction("👍")
     await mensagem.add_reaction("👎")
 
-
 @bot.tree.command(name="lembrete", description="Define um lembrete")
 async def lembrete(interaction: discord.Interaction, minutos: int, texto: str):
     await interaction.response.defer()
     await interaction.followup.send(f"⏰ Lembrete definido para daqui a **{minutos}m**.")
     await asyncio.sleep(minutos * 60)
     await interaction.channel.send(f"🔔 {interaction.user.mention}, **Lembrete:** {texto}")
-
 
 # ==========================================
 # 💵 COMANDO DE COTAÇÃO E CONVERSÃO DE MOEDAS
@@ -778,9 +749,8 @@ async def moeda(interaction: discord.Interaction, de: str = "USD", para: str = "
 
     except Exception as e:
         await interaction.followup.send(f"❌ Ocorreu um erro ao consultar as cotações: `{e}`")
-        
-        
-        # ==========================================
+
+# ==========================================
 # 🤖 COMANDOS DE INTELIGÊNCIA ARTIFICIAL
 # ==========================================
 @bot.tree.command(name="gemini", description="Pergunte algo para a IA do Google (Gemini).")
@@ -811,7 +781,6 @@ async def gemini_cmd(interaction: discord.Interaction, pergunta: str):
 
     except Exception as e:
         await interaction.followup.send(f"❌ Erro ao processar resposta do Gemini: `{e}`")
-
 
 @bot.tree.command(name="chatgpt", description="Pergunte algo para o ChatGPT (OpenAI).")
 async def chatgpt_cmd(interaction: discord.Interaction, pergunta: str):
@@ -844,7 +813,6 @@ async def chatgpt_cmd(interaction: discord.Interaction, pergunta: str):
 
     except Exception as e:
         await interaction.followup.send(f"❌ Erro ao processar resposta do ChatGPT: `{e}`")
-
 
 # ==========================================
 # 🎨 COMANDOS DE GERENCIAMENTO E DECORAÇÃO DE CANAIS
@@ -891,7 +859,6 @@ async def criar_canal(
     except Exception as e:
         await interaction.followup.send(f"⚠️ Ocorreu um erro ao criar o canal: `{e}`", ephemeral=True)
 
-
 @bot.tree.command(name="renomear_canal", description="Altera o nome de um canal para um novo formato/decorado.")
 @app_commands.checks.has_permissions(manage_channels=True)
 async def renomear_canal(
@@ -919,7 +886,6 @@ async def renomear_canal(
     except Exception as e:
         await interaction.followup.send(f"⚠️ Ocorreu um erro ao renomear: `{e}`", ephemeral=True)
 
-
 # ==========================================
 # 🛡️ MODERAÇÃO E GESTÃO
 # ==========================================
@@ -930,14 +896,12 @@ async def limpar(interaction: discord.Interaction, quantidade: int):
     deleted = await interaction.channel.purge(limit=quantidade)
     await interaction.followup.send(f"🧹 **{len(deleted)}** mensagens apagadas!", ephemeral=True)
 
-
 @bot.tree.command(name="limparuser", description="Apaga mensagens de um usuário específico")
 @app_commands.checks.has_permissions(manage_messages=True)
 async def limparuser(interaction: discord.Interaction, membro: discord.Member, quantidade: int = 20):
     await interaction.response.defer(ephemeral=True)
     deleted = await interaction.channel.purge(limit=quantidade, check=lambda m: m.author.id == membro.id)
     await interaction.followup.send(f"🧹 Apagadas **{len(deleted)}** mensagens de {membro.mention}!", ephemeral=True)
-
 
 @bot.tree.command(name="kick", description="Expulsa um membro")
 @app_commands.checks.has_permissions(kick_members=True)
@@ -946,7 +910,6 @@ async def kick(interaction: discord.Interaction, membro: discord.Member, motivo:
     await membro.kick(reason=motivo)
     await interaction.followup.send(f"👞 **{membro.mention}** foi expulso. Motivo: *{motivo}*")
 
-
 @bot.tree.command(name="ban", description="Bane um membro")
 @app_commands.checks.has_permissions(ban_members=True)
 async def ban(interaction: discord.Interaction, membro: discord.Member, motivo: str = "Não especificado"):
@@ -954,15 +917,13 @@ async def ban(interaction: discord.Interaction, membro: discord.Member, motivo: 
     await membro.ban(reason=motivo)
     await interaction.followup.send(f"🔨 **{membro.mention}** foi banido. Motivo: *{motivo}*")
 
-
 @bot.tree.command(name="mute", description="Silencia um membro temporariamente")
 @app_commands.checks.has_permissions(moderate_members=True)
 async def mute(interaction: discord.Interaction, membro: discord.Member, minutos: int, motivo: str = "Não especificado"):
     await interaction.response.defer()
-    tempo = discord.utils.utcnow() + datetime.timedelta(minutes=minutos)
+    tempo = discord.utils.utcnow() + timedelta(minutes=minutos)
     await membro.timeout(tempo, reason=motivo)
     await interaction.followup.send(f"🔇 **{membro.mention}** silenciado por **{minutos}m**.")
-
 
 @bot.tree.command(name="unmute", description="Remove o silêncio de um membro")
 @app_commands.checks.has_permissions(moderate_members=True)
@@ -970,7 +931,6 @@ async def unmute(interaction: discord.Interaction, membro: discord.Member):
     await interaction.response.defer()
     await membro.timeout(None)
     await interaction.followup.send(f"🔊 O silêncio de **{membro.mention}** foi removido!")
-
 
 @bot.tree.command(name="warn", description="Envia uma advertência para um membro")
 @app_commands.checks.has_permissions(moderate_members=True)
@@ -983,14 +943,12 @@ async def warn(interaction: discord.Interaction, membro: discord.Member, motivo:
         pass
     await interaction.followup.send(f"⚠️ Advertência aplicada a **{membro.mention}**!\n**Motivo:** *{motivo}*")
 
-
 @bot.tree.command(name="addcargo", description="Adiciona um cargo a um membro")
 @app_commands.checks.has_permissions(manage_roles=True)
 async def addcargo(interaction: discord.Interaction, membro: discord.Member, cargo: discord.Role):
     await interaction.response.defer()
     await membro.add_roles(cargo)
     await interaction.followup.send(f"✅ Cargo {cargo.mention} adicionado a **{membro.mention}**!")
-
 
 @bot.tree.command(name="removecargo", description="Remove um cargo de um membro")
 @app_commands.checks.has_permissions(manage_roles=True)
@@ -999,14 +957,12 @@ async def removecargo(interaction: discord.Interaction, membro: discord.Member, 
     await membro.remove_roles(cargo)
     await interaction.followup.send(f"🗑️ Cargo {cargo.mention} removido de **{membro.mention}**!")
 
-
 @bot.tree.command(name="nick", description="Altera o apelido de um membro")
 @app_commands.checks.has_permissions(manage_nicknames=True)
 async def nick(interaction: discord.Interaction, membro: discord.Member, novo_apelido: str):
     await interaction.response.defer()
     await membro.edit(nick=novo_apelido)
     await interaction.followup.send(f"📝 Apelido de **{membro.mention}** alterado para `{novo_apelido}`!")
-
 
 @bot.tree.command(name="anuncio", description="Envia um anúncio formatado")
 @app_commands.checks.has_permissions(administrator=True)
@@ -1016,7 +972,6 @@ async def anuncio(interaction: discord.Interaction, canal: discord.TextChannel, 
     await canal.send(embed=embed)
     await interaction.followup.send(f"✅ Anúncio enviado em {canal.mention}!", ephemeral=True)
 
-
 @bot.tree.command(name="lock", description="Tranca o canal atual")
 @app_commands.checks.has_permissions(manage_channels=True)
 async def lock(interaction: discord.Interaction):
@@ -1024,14 +979,12 @@ async def lock(interaction: discord.Interaction):
     await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=False)
     await interaction.followup.send("🔒 Este canal foi **trancado**.")
 
-
 @bot.tree.command(name="unlock", description="Destranca o canal atual")
 @app_commands.checks.has_permissions(manage_channels=True)
 async def unlock(interaction: discord.Interaction):
     await interaction.response.defer()
     await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=True)
     await interaction.followup.send("🔓 Este canal foi **destrancado**.")
-
 
 @bot.tree.command(name="sorteio", description="Sorteia um membro do servidor")
 @app_commands.checks.has_permissions(administrator=True)
@@ -1041,7 +994,6 @@ async def sorteio(interaction: discord.Interaction, premio: str):
     vencedor = random.choice(membros)
     embed = discord.Embed(title="🎉 SORTEIO!", description=f"**Prêmio:** {premio}\n🏆 **Vencedor:** {vencedor.mention}", color=discord.Color.gold())
     await interaction.followup.send(embed=embed)
-
 
 # ==========================================
 # ⚙️ TRATAMENTO UNIFICADO DE ERROS
@@ -1061,9 +1013,8 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
     else:
         await interaction.followup.send(msg, ephemeral=True)
 
-
 # ==========================================
-# 🚀 INICIALIZAÇÃO
+# 🚀 INICIALIZAÇÃO E CARREGAMENTO DE EXTENSÕES
 # ==========================================
 keep_alive()
 
@@ -1071,38 +1022,38 @@ async def main():
     async with bot:
         token = os.environ.get('DISCORD_TOKEN')
         if not token:
-            print("❌ ERRO CRÍTICO: DISCORD_TOKEN não encontrado!")
+            logging.error("❌ ERRO CRÍTICO: DISCORD_TOKEN não encontrado!")
             return
         
-        # 1. Carrega a Cog do RPG (pet_rpg.py na raiz)
+        # 1. Cog do RPG
         try:
             await bot.load_extension("pet_rpg")
-            print("🟢 Cog 'pet_rpg' carregada!")
+            logging.info("🟢 Cog 'pet_rpg' carregada!")
         except Exception as e:
-            print(f"⚠️ Erro ao carregar 'pet_rpg': {e}")
+            logging.error(f"⚠️ Erro ao carregar 'pet_rpg': {e}")
 
-        # 2. Carrega a Cog de Música
+        # 2. Cog de Música (mudar para "cogs.music" se o arquivo music.py estiver na pasta cogs)
         try:
-            await bot.load_extension("cogs.music")
-            print("🟢 Cog 'cogs.music' carregada!")
+            await bot.load_extension("music")
+            logging.info("🟢 Cog 'music' carregada!")
         except Exception as e:
-            print(f"⚠️ Erro ao carregar 'cogs.music': {e}")
+            logging.error(f"⚠️ Erro ao carregar 'music': {e}")
 
-        # 3. Carrega a Cog de Jogos
+        # 3. Cog de Jogos
         try:
             await bot.load_extension("cogs.jogos")
-            print("🟢 Cog 'cogs.jogos' carregada!")
+            logging.info("🟢 Cog 'cogs.jogos' carregada!")
         except Exception as e:
-            print(f"⚠️ Erro ao carregar 'cogs.jogos': {e}")
+            logging.error(f"⚠️ Erro ao carregar 'cogs.jogos': {e}")
 
-        # 4. Carrega a Cog de Gacha
+        # 4. Cog de Gacha
         try:
             await bot.load_extension("cogs.gacha")
-            print("🟢 Cog 'cogs.gacha' carregada!")
+            logging.info("🟢 Cog 'cogs.gacha' carregada!")
         except Exception as e:
-            print(f"⚠️ Erro ao carregar 'cogs.gacha': {e}")
+            logging.error(f"⚠️ Erro ao carregar 'cogs.gacha': {e}")
         
-        # 5. Inicia o bot
+        # 5. Inicia a sessão no Discord
         await bot.start(token)
 
 if __name__ == "__main__":
