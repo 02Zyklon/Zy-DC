@@ -1,6 +1,5 @@
 import os
 import asyncio
-import datetime
 import random
 import json
 import logging
@@ -9,8 +8,33 @@ import aiohttp
 from discord.ext import commands
 from discord import app_commands
 from keep_alive import keep_alive
-import economy  # 🟢 Importação do módulo unificado de Economia
+import economy
 
+from datetime import datetime, timedelta
+
+DB_RPG = "config_rpg.json"
+
+def obter_pet_com_buffs(user_id: str, dados_rpg: dict):
+    pet = dados_rpg.get("pets", {}).get(user_id)
+    if not pet:
+        return None
+
+    # Inicializa chaves caso não existam no JSON antigo
+    pet.setdefault("sorte_bonus", 0.0)
+    pet.setdefault("bonus_xp", 1.0)
+    pet.setdefault("buff_expira_em", None)
+
+    # Verifica se o tempo do buff acabou
+    if pet["buff_expira_em"]:
+        data_expira = datetime.fromisoformat(pet["buff_expira_em"])
+        if datetime.now() > data_expira:
+            pet["sorte_bonus"] = 0.0
+            pet["bonus_xp"] = 1.0
+            pet["buff_expira_em"] = None
+            save_json(DB_RPG, dados_rpg)
+
+    return pet
+    
 # Configura logs visíveis em tempo real no Discloud
 logging.basicConfig(
     level=logging.INFO,
@@ -456,6 +480,48 @@ async def painelticket(interaction: discord.Interaction):
 # ==========================================
 # 🛠️ UTILITÁRIOS
 # ==========================================
+@bot.tree.command(name="darsorte", description="[ADMIN] Concede bônus de sorte e XP para o pet de um usuário.")
+@app_commands.describe(
+    membro="Membro que receberá o bônus no Pet",
+    sorte_porcentagem="Porcentagem de sorte extra na luta (ex: 25 para +25% de chance de vitória)",
+    multiplicador_xp="Multiplicador de XP nas batalhas (ex: 2.0 para ganhar XP em dobro)",
+    dias="Duração do bônus em dias"
+)
+@app_commands.checks.has_permissions(administrator=True)
+async def darsorte(
+    interaction: discord.Interaction, 
+    membro: discord.Member, 
+    sorte_porcentagem: int, 
+    multiplicador_xp: float, 
+    dias: int
+):
+    await interaction.response.defer(ephemeral=True)
+    user_id = str(membro.id)
+    
+    dados_rpg = load_json(DB_RPG, {})
+    pets = dados_rpg.get("pets", {})
+
+    if user_id not in pets:
+        await interaction.followup.send(f"❌ O usuário {membro.mention} ainda não possui um Pet registrado!", ephemeral=True)
+        return
+
+    # Valida e aplica os novos buffs
+    expira_em = (datetime.now() + timedelta(dias=dias)).isoformat()
+    pets[user_id]["sorte_bonus"] = sorte_porcentagem / 100.0  # Ex: 20% -> 0.20
+    pets[user_id]["bonus_xp"] = multiplicador_xp
+    pets[user_id]["buff_expira_em"] = expira_em
+
+    save_json(DB_RPG, dados_rpg)
+
+    await interaction.followup.send(
+        f"✨ **Buff concedido com sucesso ao Pet de {membro.mention}!**\n\n"
+        f"🐾 **Pet:** {pets[user_id]['nome']}\n"
+        f"🍀 **Bônus de Sorte:** +{sorte_porcentagem}%\n"
+        f"📈 **Multiplicador de XP:** {multiplicador_xp}x\n"
+        f"⏳ **Validade:** {dias} dia(s)",
+        ephemeral=True
+    )
+    
 @bot.tree.command(name="ping", description="Verifica a latência do bot")
 async def ping(interaction: discord.Interaction):
     await interaction.response.defer()
