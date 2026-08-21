@@ -12,3 +12,4 @@ openai
 aiofiles
 spotipy
 akinator.py
+wavelink>=3.1.0
