@@ -7,6 +7,35 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import economy  # Certifique-se de que o economy.py está na mesma pasta
+import random
+
+# Exemplo dentro da função/comando de batalha no pets_rpg.py:
+dados_rpg = load_json("config_rpg.json", {})
+pet = obter_pet_com_buffs(user_id, dados_rpg)
+
+if not pet:
+    await interaction.response.send_message("❌ Você ainda não possui um pet!", ephemeral=True)
+    return
+
+# Chance base de vitória é 50% (0.50) + Bônus de sorte (ex: 0.20)
+chance_vitoria = 0.50 + pet.get("sorte_bonus", 0.0)
+
+if random.random() <= chance_vitoria:
+    # VITÓRIA: XP ganho multiplicado pelo bônus
+    xp_base = 40
+    xp_final = int(xp_base * pet.get("bonus_xp", 1.0))
+    
+    pet["xp"] += xp_final
+    pet["vitorias"] = pet.get("vitorias", 0) + 1
+    save_json("config_rpg.json", dados_rpg)
+    
+    msg = f"⚔️ **Vitória!** Seu pet **{pet['nome']}** ganhou **+{xp_final} XP**!"
+    if pet.get("bonus_xp", 1.0) > 1.0:
+        msg += f" *(XP x{pet['bonus_xp']} Ativo)*"
+else:
+    msg = f"❌ **Derrota!** O inimigo se defendeu e venceu o combate."
+
+await interaction.response.send_message(msg)
 
 DB_RPG = "config_rpg.json"
 
