@@ -480,47 +480,39 @@ async def painelticket(interaction: discord.Interaction):
 # ==========================================
 # 🛠️ UTILITÁRIOS
 # ==========================================
-@bot.tree.command(name="darsorte", description="[ADMIN] Concede bônus de sorte e XP para o pet de um usuário.")
-@app_commands.describe(
-    membro="Membro que receberá o bônus no Pet",
-    sorte_porcentagem="Porcentagem de sorte extra na luta (ex: 25 para +25% de chance de vitória)",
-    multiplicador_xp="Multiplicador de XP nas batalhas (ex: 2.0 para ganhar XP em dobro)",
-    dias="Duração do bônus em dias"
-)
+@app_commands.command(name="darsorte", description="Aplica um buff temporário de sorte e bônus de XP a um jogador.")
 @app_commands.checks.has_permissions(administrator=True)
-async def darsorte(
-    interaction: discord.Interaction, 
-    membro: discord.Member, 
-    sorte_porcentagem: int, 
-    multiplicador_xp: float, 
-    dias: int
-):
+async def darsorte(self, interaction: discord.Interaction, usuario: discord.Member, dias: int = 1, sorte: float = 0.20, bonus_xp: float = 1.5):
     await interaction.response.defer(ephemeral=True)
-    user_id = str(membro.id)
+
+    db = load_rpg_db()
+    user_id = str(usuario.id)
+
+    if user_id not in db["pets"]:
+        return await interaction.followup.send("❌ Esse usuário não possui um pet cadastrado!", ephemeral=True)
+
+    pet = db["pets"][user_id]
     
-    dados_rpg = load_json(DB_RPG, {})
-    pets = dados_rpg.get("pets", {})
+    # 🔧 Correção aplicada aqui: use 'days=dias'
+    data_expiracao = datetime.datetime.now() + datetime.timedelta(days=dias)
+    
+    pet["sorte_bonus"] = sorte
+    pet["bonus_xp"] = bonus_xp
+    pet["buff_expira_em"] = data_expiracao.isoformat()
 
-    if user_id not in pets:
-        await interaction.followup.send(f"❌ O usuário {membro.mention} ainda não possui um Pet registrado!", ephemeral=True)
-        return
+    save_rpg_db(db)
 
-    # Valida e aplica os novos buffs
-    expira_em = (datetime.now() + timedelta(dias=dias)).isoformat()
-    pets[user_id]["sorte_bonus"] = sorte_porcentagem / 100.0  # Ex: 20% -> 0.20
-    pets[user_id]["bonus_xp"] = multiplicador_xp
-    pets[user_id]["buff_expira_em"] = expira_em
-
-    save_json(DB_RPG, dados_rpg)
-
-    await interaction.followup.send(
-        f"✨ **Buff concedido com sucesso ao Pet de {membro.mention}!**\n\n"
-        f"🐾 **Pet:** {pets[user_id]['nome']}\n"
-        f"🍀 **Bônus de Sorte:** +{sorte_porcentagem}%\n"
-        f"📈 **Multiplicador de XP:** {multiplicador_xp}x\n"
-        f"⏳ **Validade:** {dias} dia(s)",
-        ephemeral=True
+    embed = discord.Embed(
+        title="🍀 Buff Aplicado com Sucesso!",
+        description=(
+            f"O pet de {usuario.mention} recebeu bênçãos especiais!\n\n"
+            f"✨ **Bônus de Sorte:** `+{int(sorte * 100)}%`\n"
+            f"📈 **Multiplicador de XP:** `{bonus_xp}x`\n"
+            f"⏳ **Duração:** `{dias} dia(s)` (Expira em: <t:{int(data_expiracao.timestamp())}:R>)"
+        ),
+        color=discord.Color.green()
     )
+    await interaction.followup.send(embed=embed, ephemeral=True)
     
 @bot.tree.command(name="ping", description="Verifica a latência do bot")
 async def ping(interaction: discord.Interaction):
