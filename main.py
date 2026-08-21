@@ -482,7 +482,13 @@ async def painelticket(interaction: discord.Interaction):
 # ==========================================
 @app_commands.command(name="darsorte", description="Aplica um buff temporário de sorte e bônus de XP a um jogador.")
 @app_commands.checks.has_permissions(administrator=True)
-async def darsorte(interaction: discord.Interaction, usuario: discord.Member, dias: int = 1, sorte: float = 0.20, bonus_xp: float = 1.5):
+async def darsorte(
+    interaction: discord.Interaction, 
+    usuario: discord.Member, 
+    dias: int = 1, 
+    sorte: float = 0.20, 
+    bonus_xp: float = 1.5
+):
     await interaction.response.defer(ephemeral=True)
 
     db = load_rpg_db()
@@ -493,6 +499,7 @@ async def darsorte(interaction: discord.Interaction, usuario: discord.Member, di
 
     pet = db["pets"][user_id]
     
+    # Define a data de expiração usando 'days'
     data_expiracao = datetime.datetime.now() + datetime.timedelta(days=dias)
     
     pet["sorte_bonus"] = sorte
@@ -507,11 +514,13 @@ async def darsorte(interaction: discord.Interaction, usuario: discord.Member, di
             f"O pet de {usuario.mention} recebeu bênçãos especiais!\n\n"
             f"✨ **Bônus de Sorte:** `+{int(sorte * 100)}%`\n"
             f"📈 **Multiplicador de XP:** `{bonus_xp}x`\n"
-            f"⏳ **Duração:** `{dias} dia(s)`"
+            f"⏳ **Duração:** `{dias} dia(s)` (Expira em: <t:{int(data_expiracao.timestamp())}:R>)"
         ),
         color=discord.Color.green()
     )
-    await interaction.followup.send(embed=embed, ephemeral=True
+    
+    # Parêntese devidamente fechado ao final da chamada
+    await interaction.followup.send(embed=embed, ephemeral=True)
     
 @bot.tree.command(name="ping", description="Verifica a latência do bot")
 async def ping(interaction: discord.Interaction):
