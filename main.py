@@ -452,149 +452,6 @@ async def painelticket(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, view=PainelTicketView())
 
 
-# ==========================================================
-# 🏗️ SETUP DO SERVIDOR
-# ==========================================================
-@bot.tree.command(name="setup_servidor", description="✨ Cria a estrutura de canais com visual Serif/Bold impecável.")
-@app_commands.checks.has_permissions(administrator=True)
-async def setup_servidor(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
-    guild = interaction.guild
-
-    try:
-        cat_filtracao = await guild.create_category("🚨 𝑭𝑰𝑳𝑻𝑹𝑨𝑪̧𝑨̃𝑶 ›")
-        await guild.create_text_channel("🚨・filtração", category=cat_filtracao)
-
-        cat_ing = await guild.create_category("📌 𝑾𝑬𝑳𝑪𝑶𝑴𝑬 ›")
-        c_regras = await guild.create_text_channel("📜・diretrizes", category=cat_ing)
-        await guild.create_text_channel("📢・anuncios", category=cat_ing)
-        await guild.create_text_channel("🎟・cargos-free", category=cat_ing)
-
-        embed_regras = discord.Embed(
-            title="📜 𝑫𝑰𝑑𝑬𝑻𝑑𝑰𝒁𝑬𝑺 𝑬 𝑑𝑬𝑮𝑑𝑨𝑺",
-            description=(
-                "**1. Respeito Mútuo:** Conduta limpa e sem ofensas gratuitas.\n"
-                "**2. Divulgação:** Proibida sem autorização prévia da moderação.\n"
-                "**3. Compras & Suporte:** Use o canal de ticket para realizar seus pedidos."
-            ),
-            color=discord.Color.dark_red()
-        )
-        await c_regras.send(embed=embed_regras)
-
-        cat_loja = await guild.create_category("🛒 𝒁𝒀𝑲𝑳𝑶𝑵 𝑽𝑬𝑵𝑫𝑨𝑺 ›")
-        await guild.create_text_channel("💎・dimas-via-token", category=cat_loja)
-        await guild.create_text_channel("🎁・presentes-e-passes", category=cat_loja)
-        await guild.create_text_channel("🤖・bots-e-automaticos", category=cat_loja)
-        await guild.create_text_channel("👑・contas-ff", category=cat_loja)
-        await guild.create_text_channel("❤️・likes-ff", category=cat_loja)
-        await guild.create_text_channel("🛒・referencias", category=cat_loja)
-        await guild.create_text_channel("📜・termos-e-uso", category=cat_loja)
-
-        cat_ticket = await guild.create_category("🛠️ 𝑨𝑻𝑬𝑵𝑫𝑰𝑑𝑬𝑵𝑻𝑶 ›")
-        await guild.create_text_channel("🎫・abrir-ticket", category=cat_ticket)
-
-        cat_dev = await guild.create_category("⚙ 𝑵𝑬𝑑𝑼𝑺 ┃ 𝑪𝑶𝑴𝑼𝑵𝑰𝑫𝑨𝑫𝑬 ›")
-        await guild.create_text_channel("💬・chat-geral", category=cat_dev)
-        await guild.create_text_channel("🤖・comandos-bot", category=cat_dev)
-        await guild.create_text_channel("💻・dev-lounge", category=cat_dev)
-        await guild.create_text_channel("🤝・parcerias", category=cat_dev)
-
-        cat_ff = await guild.create_category("🏆 𝑶𝑺 𝑨𝑴𝑶𝑺𝑻𝑑𝑨𝑫𝑰𝑵𝑯𝑶𝑺 ›")
-        await guild.create_text_channel("💬・chat-central", category=cat_ff)
-        await guild.create_text_channel("📌・avisos-linha-de-frente", category=cat_ff)
-        await guild.create_text_channel("🔒・chat-lideres-amd", category=cat_ff)
-
-        for i in range(1, 11):
-            await guild.create_voice_channel(f"🎙・{i}ª-Line", user_limit=5, category=cat_ff)
-
-        cat_calls = await guild.create_category("🔊 𝑪𝑨𝑳𝑳𝑺 ┃ 𝑷𝑼𝑩𝑳𝑰𝑪𝑨𝑺 ›")
-        await guild.create_voice_channel("🎧・Main-Lobby", category=cat_calls)
-        await guild.create_voice_channel("🎯・Squad-01", user_limit=4, category=cat_calls)
-        await guild.create_voice_channel("🎯・Squad-02", user_limit=4, category=cat_calls)
-        await guild.create_voice_channel("☕・Resenha-01", category=cat_calls)
-
-        cat_admin = await guild.create_category("🔒 𝑨𝑫𝑑𝑰𝑵 𝑷𝑨𝑵𝑬𝑳 ›")
-        await guild.create_text_channel("📡・bot-logs", category=cat_admin)
-        await guild.create_text_channel("🛡・staff-only", category=cat_admin)
-
-        cat_rpg = await guild.create_category("⚔️ 𝑹𝑷𝑮 𝒀𝑮𝑮𝑫𝑑𝑨𝑺𝑰𝑳 ›")
-        c_como_jogar = await guild.create_text_channel("📜・como-jogar", category=cat_rpg)
-        await guild.create_text_channel("🔥・foguinho-e-cassino", category=cat_rpg)
-        await guild.create_text_channel("🐉・masmorras", category=cat_rpg)
-        await guild.create_text_channel("🐾・meu-pet", category=cat_rpg)
-        await guild.create_text_channel("🏆・ostentacao-rank", category=cat_rpg)
-
-        embed_rpg_guia = discord.Embed(
-            title="⚔️ 𝑩𝑬𝑴-𝑽𝑰𝑵𝑫𝑶 𝑨𝑶 𝑹𝑷𝑮 𝒀𝑮𝑮𝑫𝑑𝑨𝑺𝑰𝑳",
-            description=(
-                "Conquiste moedas, evolua seus pets e explore as profundezas da Yggdrasil!\n\n"
-                "📌 **Comandos Principais:**\n"
-                "• `/daily` — Colete sua recompensa diária de Golds.\n"
-                "• `/foguinho` — Teste sua sorte no jogo do foguinho.\n"
-                "• `/masmorra` — Enfrente monstros e ganhe recompensas.\n"
-                "• `/pet` — Cuide do seu companheiro de batalha.\n"
-                "• `/carteira` e `/rank` — Veja seu saldo e os mais ricos do servidor.\n"
-                "• `/velha` — Desafie outro membro para um X1."
-            ),
-            color=discord.Color.dark_purple()
-        )
-        embed_rpg_guia.set_footer(text="Aproveite e boa sorte nas batalhas!")
-        await c_como_jogar.send(embed=embed_rpg_guia)
-
-        await interaction.followup.send("✨ **Servidor gerado com sucesso e visual 100% corrigido!**", ephemeral=True)
-
-    except Exception as e:
-        await interaction.followup.send(f"❌ **Erro no setup:** `{e}`", ephemeral=True)
-
-
-# ==========================================
-# ⚔️ SETUP ISOLADO DO RPG YGGDRASIL
-# ==========================================
-@bot.tree.command(name="setup_rpg", description="⚔️ Cria apenas a categoria e os canais do RPG Yggdrasil.")
-@app_commands.checks.has_permissions(administrator=True)
-async def setup_rpg(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
-    guild = interaction.guild
-
-    nome_categoria = "⚔️ 𝑹𝑷𝑮 𝒀𝑮𝑮𝑫𝑑𝑨𝑺𝑰𝑳 ›"
-    cat_existente = discord.utils.get(guild.categories, name=nome_categoria)
-
-    if cat_existente:
-        return await interaction.followup.send(
-            f"⚠️ A categoria **{nome_categoria}** já existe neste servidor! Apague-a primeiro se quiser recriar.", 
-            ephemeral=True
-        )
-
-    try:
-        cat_rpg = await guild.create_category(nome_categoria)
-        c_como_jogar = await guild.create_text_channel("📜・como-jogar", category=cat_rpg)
-        await guild.create_text_channel("🔥・foguinho-e-cassino", category=cat_rpg)
-        await guild.create_text_channel("🐉・masmorras", category=cat_rpg)
-        await guild.create_text_channel("🐾・meu-pet", category=cat_rpg)
-        await guild.create_text_channel("🏆・ostentacao-rank", category=cat_rpg)
-
-        embed_rpg_guia = discord.Embed(
-            title="⚔️ 𝑩𝑬𝑴-𝑽𝑰𝑵𝑫𝑶 𝑨𝑶 𝑹𝑷𝑮 𝒀𝑮𝑮𝑫𝑑𝑨𝑺𝑰𝑳",
-            description=(
-                "Conquiste moedas, evolua seus pets e explore as profundezas da Yggdrasil!\n\n"
-                "📌 **Comandos Principais:**\n"
-                "• `/daily` — Colete sua recompensa diária de Golds.\n"
-                "• `/foguinho` — Teste sua sorte no jogo do foguinho.\n"
-                "• `/masmorra` — Enfrente monstros e ganhe recompensas.\n"
-                "• `/pet` — Cuide do seu companheiro de batalha.\n"
-                "• `/carteira` e `/rank` — Veja seu saldo e os mais ricos do servidor.\n"
-                "• `/velha` — Desafie outro membro para um X1."
-            ),
-            color=discord.Color.dark_purple()
-        )
-        embed_rpg_guia.set_footer(text="Aproveite e boa sorte nas batalhas!")
-        await c_como_jogar.send(embed=embed_rpg_guia)
-
-        await interaction.followup.send("✨ **Categoria e canais do RPG Yggdrasil criados com sucesso!**", ephemeral=True)
-
-    except Exception as e:
-        await interaction.followup.send(f"❌ **Erro ao criar a categoria RPG:** `{e}`", ephemeral=True)
-
 
 # ==========================================
 # 🛠️ UTILITÁRIOS
@@ -639,34 +496,30 @@ async def serverinfo(interaction: discord.Interaction):
 # ==========================================
 # ➕ COMANDO ADMIN: ADICIONAR COMANDO AO /AJUDA
 # ==========================================
-@bot.tree.command(name="adc_comando", description="[ADMIN] Adiciona um novo comando a uma categoria no menu /ajuda.")
+@@bot.tree.command(name="adc_comando", description="[ADMIN] Adiciona um novo comando a uma categoria no menu /ajuda.")
 @app_commands.describe(
     categoria="A categoria onde o comando vai aparecer",
     nome_comando="O nome do comando (ex: /ban ou /pet)",
     descricao="Breve explicação do que o comando faz"
 )
 @app_commands.choices(categoria=[
-    app_commands.Choice(name="🐾 Sistema de Pets & RPG", value="🐾 Sistema de Pets & RPG"),
-    app_commands.Choice(name="💰 Economia & Carteira", value="💰 Economia & Carteira"),
-    app_commands.Choice(name="🛠️ Utilitários & IAs", value="🛠️ Utilitários & IAs"),
-    app_commands.Choice(name="🛒 Vendas & Tickets", value="🛒 Vendas & Tickets"),
-    app_commands.Choice(name="🎫 Atendimento & Registro", value="🎫 Atendimento & Registro"),
-    app_commands.Choice(name="🛡️ Moderação & Gestão", value="🛡️ Moderação & Gestão"),
+    app_commands.Choice(name=cat, value=cat) for cat in CATEGORIAS_VALIDAS
 ])
 @app_commands.checks.has_permissions(administrator=True)
-async def adc_comando(interaction: discord.Interaction, categoria: str, nome_comando: str, descricao: str):
+async def adc_comando(interaction: discord.Interaction, categoria: app_commands.Choice[str], nome_comando: str, descricao: str):
     await interaction.response.defer(ephemeral=True)
     
+    cat_nome = categoria.value
     dados_ajuda = load_json(DB_AJUDA, {cat: {} for cat in CATEGORIAS_VALIDAS})
     
-    if categoria not in dados_ajuda:
-        dados_ajuda[categoria] = {}
+    if cat_nome not in dados_ajuda:
+        dados_ajuda[cat_nome] = {}
         
-    dados_ajuda[categoria][nome_comando] = descricao
+    dados_ajuda[cat_nome][nome_comando] = descricao
     save_json(DB_AJUDA, dados_ajuda)
     
     await interaction.followup.send(
-        f"✅ Comando **{nome_comando}** adicionado com sucesso à categoria **{categoria}**!", 
+        f"✅ Comando **{nome_comando}** adicionado com sucesso à categoria **{cat_nome}**!", 
         ephemeral=True
     )
 
@@ -678,27 +531,41 @@ class AjudaView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=180)
 
-    @discord.ui.select(
-        placeholder="📂 Escolha uma categoria de comandos...",
-        min_values=1,
-        max_values=1,
-        options=[
-            discord.SelectOption(label="🐾 Sistema de Pets & RPG", description="Comandos de adoção, perfil, loja, inventário e exploração.", emoji="🐉"),
-            discord.SelectOption(label="💰 Economia & Carteira", description="Comandos de saldo, pagamentos e rank de golds.", emoji="💳"),
-            discord.SelectOption(label="🛠️ Utilitários & IAs", description="Comandos gerais, perfil, cotações e Inteligências Artificiais", emoji="🛠️"),
-            discord.SelectOption(label="🛒 Vendas & Tickets", description="Sistemas de suporte e anúncios de produtos", emoji="🛒"),
-            discord.SelectOption(label="🎫 Atendimento & Registro", description="Configurações de suporte e filtração por senha", emoji="🎫"),
-            discord.SelectOption(label="🛡️ Moderação & Gestão", description="Comandos de administração do servidor", emoji="🛡️")
-        ]
-    )
-    async def selecionar_categoria(self, interaction: discord.Interaction, select: discord.ui.Select):
-        opcao = select.values[0]
+        # Mapeamento de emojis e descrições visuais para o menu
+        icones_e_descricoes = {
+            "🎮 Jogos & Mini-Games": ("🎮", "Comandos de RPG, mini-games, apostas e diversão."),
+            "💰 Economia & Carteira": ("💳", "Comandos de saldo, pagamentos e rank de golds."),
+            "🛠️ Utilitários & IAs": ("🛠️", "Comandos gerais, perfil, cotações e Inteligências Artificiais."),
+            "🛒 Vendas & Tickets": ("🛒", "Sistemas de suporte e anúncios de produtos."),
+            "🎫 Atendimento & Registro": ("🎫", "Configurações de suporte e filtração por senha."),
+            "🛡️ Moderação & Gestão": ("🛡️", "Comandos de administração do servidor.")
+        }
+
+        options = []
+        for cat in CATEGORIAS_VALIDAS:
+            emoji, desc = icones_e_descricoes.get(cat, ("📂", "Lista de comandos da categoria."))
+            options.append(
+                discord.SelectOption(label=cat, description=desc, emoji=emoji)
+            )
+
+        select_menu = discord.ui.Select(
+            placeholder="📂 Escolha uma categoria de comandos...",
+            min_values=1,
+            max_values=1,
+            options=options
+        )
+        select_menu.callback = self.selecionar_categoria
+        self.add_item(select_menu)
+
+    async def selecionar_categoria(self, interaction: discord.Interaction):
+        # Pega a opção selecionada no menu
+        opcao = interaction.data["values"][0]
         
         dados_ajuda = load_json(DB_AJUDA, {})
         comandos_categoria = dados_ajuda.get(opcao, {})
 
         cores = {
-            "🐾 Sistema de Pets & RPG": discord.Color.green(),
+            "🎮 Jogos & Mini-Games": discord.Color.green(),
             "💰 Economia & Carteira": discord.Color.gold(),
             "🛠️ Utilitários & IAs": discord.Color.blue(),
             "🛒 Vendas & Tickets": discord.Color.green(),
@@ -720,7 +587,6 @@ class AjudaView(discord.ui.View):
 
         embed.set_footer(text="Zy-Bot • Selecione qualquer categoria no menu acima para navegar.")
         await interaction.response.edit_message(embed=embed, view=self)
-
 
 @bot.tree.command(name="ajuda", description="Central de ajuda interativa do bot")
 async def ajuda(interaction: discord.Interaction):
