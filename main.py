@@ -496,7 +496,7 @@ async def serverinfo(interaction: discord.Interaction):
 # ==========================================
 # ➕ COMANDO ADMIN: ADICIONAR COMANDO AO /AJUDA
 # ==========================================
-@@bot.tree.command(name="adc_comando", description="[ADMIN] Adiciona um novo comando a uma categoria no menu /ajuda.")
+@bot.tree.command(name="adc_comando", description="[ADMIN] Adiciona um novo comando a uma categoria no menu /ajuda.")
 @app_commands.describe(
     categoria="A categoria onde o comando vai aparecer",
     nome_comando="O nome do comando (ex: /ban ou /pet)",
