@@ -1,58 +1,65 @@
 import json
 import os
+import asyncio
 
-DB_FILE = "database_golds.json"
+CAMINHO_BANCO = "database_golds.json"
 
-def _load_data() -> dict:
-    if not os.path.exists(DB_FILE):
+# Trava de segurança para impedir acessos simultâneos ao mesmo arquivo
+_lock = asyncio.Lock()
+
+def _carregar_dados_raw() -> dict:
+    if not os.path.exists(CAMINHO_BANCO):
+        with open(CAMINHO_BANCO, "w", encoding="utf-8") as f:
+            json.dump({}, f, indent=4)
         return {}
+    
     try:
-        with open(DB_FILE, "r", encoding="utf-8") as f:
+        with open(CAMINHO_BANCO, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception:
+    except Exception as e:
+        print(f"⚠️ Erro ao ler {CAMINHO_BANCO}: {e}")
         return {}
 
-def _save_data(data: dict) -> None:
-    with open(DB_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
+def _salvar_dados_raw(dados: dict):
+    try:
+        with open(CAMINHO_BANCO, "w", encoding="utf-8") as f:
+            json.dump(dados, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        print(f"⚠️ Erro ao salvar {CAMINHO_BANCO}: {e}")
 
+# --- FUNÇÕES SÍNCRONAS (COMPATIBILIDADE) ---
 def get_gold(user_id: int) -> int:
-    """Retorna o saldo atual de Golds do usuário."""
-    data = _load_data()
-    uid = str(user_id)
-    return data.get(uid, {}).get("gold", 0)
+    dados = _carregar_dados_raw()
+    return dados.get(str(user_id), 0)
 
-def add_gold(user_id: int, amount: int) -> int:
-    """Adiciona Golds ao saldo do usuário e retorna o novo total."""
-    data = _load_data()
-    uid = str(user_id)
-    
-    if uid not in data:
-        data[uid] = {"gold": 0}
-    
-    data[uid]["gold"] = data[uid].get("gold", 0) + amount
-    _save_data(data)
-    return data[uid]["gold"]
+def add_gold(user_id: int, valor: int):
+    dados = _carregar_dados_raw()
+    user_str = str(user_id)
+    saldo_atual = dados.get(user_str, 0)
+    dados[user_str] = saldo_atual + valor
+    _salvar_dados_raw(dados)
 
-def remove_gold(user_id: int, amount: int) -> bool:
-    """Remove Golds do usuário se ele tiver saldo suficiente."""
-    data = _load_data()
-    uid = str(user_id)
-    current = data.get(uid, {}).get("gold", 0)
+def remove_gold(user_id: int, valor: int) -> bool:
+    dados = _carregar_dados_raw()
+    user_str = str(user_id)
+    saldo_atual = dados.get(user_str, 0)
     
-    if current < amount:
+    if saldo_atual < valor:
         return False
         
-    data[uid]["gold"] = current - amount
-    _save_data(data)
+    dados[user_str] = max(0, saldo_atual - valor)
+    _salvar_dados_raw(dados)
     return True
 
-def get_top_richest(limit: int = 10) -> list:
-    """Retorna a lista dos usuários mais ricos ordenados por Gold."""
-    data = _load_data()
-    sorted_users = sorted(
-        data.items(), 
-        key=lambda item: item[1].get("gold", 0) if isinstance(item[1], dict) else 0, 
-        reverse=True
-    )
-    return sorted_users[:limit]
+# --- FUNÇÕES ASSÍNCRONAS COM LOCK (SEGURA CONTRA CORRUPÇÃO) ---
+async def get_gold_safe(user_id: int) -> int:
+    async with _lock:
+        return get_gold(user_id)
+
+async def add_gold_safe(user_id: int, valor: int):
+    async with _lock:
+        add_gold(user_id, valor)
+
+async def remove_gold_safe(user_id: int, valor: int) -> bool:
+    async with _lock:
+        return remove_gold(user_id, valor)
