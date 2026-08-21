@@ -42,7 +42,7 @@ DB_REGISTRO = "config_registro.json"
 DB_AJUDA = "ajuda_config.json"
 
 CATEGORIAS_VALIDAS = [
-    "🐾 Sistema de Pets & RPG",
+    "🎮 Jogos & Mini-Games",
     "💰 Economia & Carteira",
     "🛠️ Utilitários & IAs",
     "🛒 Vendas & Tickets",
