@@ -291,7 +291,10 @@ class Jogos(commands.Cog):
         palavra_secreta = random.choice(lista_termo)
         await interaction.response.send_modal(TermoModal(palavra_secreta))
 
-    # 3. FORCA
+# Conjunto para rastrear canais que já possuem um jogo da forca ativo
+    jogos_forca_ativos = set()
+
+    # 3. FORCA (CORRIGIDA COM CONTROLE DE SESSÃO)
     @app_commands.command(name="forca", description="Jogo da forca no chat.")
     @app_commands.choices(categoria=[
         app_commands.Choice(name="Geral / Diversos", value="geral"),
@@ -299,47 +302,65 @@ class Jogos(commands.Cog):
         app_commands.Choice(name="Games", value="games")
     ])
     async def forca(self, interaction: discord.Interaction, categoria: app_commands.Choice[str] = None):
-        cat = categoria.value if categoria else "geral"
-        banco_forca = TEXTOS.get("forca", {})
-        lista_palavras = banco_forca.get(cat, banco_forca.get("geral", ["DISCORD"]))
-        
-        palavra = random.choice(lista_palavras).upper()
-        letras_descobertas = set()
-        tentativas = 6
+        channel_id = interaction.channel_id
 
-        def formatar_palavra():
-            return " ".join([l if l in letras_descobertas else "\\_" for l in palavra])
+        # Verifica se já existe um jogo da forca rodando neste canal
+        if channel_id in self.jogos_forca_ativos:
+            await interaction.response.send_message(
+                "⚠️ Já existe um jogo da forca em andamento neste canal! Aguarde o término.", 
+                ephemeral=True
+            )
+            return
 
-        await interaction.response.send_message(
-            f"🎮 **Jogo da Forca iniciado!**\nPalavra: {formatar_palavra()}\nTentativas restantes: `{tentativas}`"
-        )
+        # Registra o canal como ativo
+        self.jogos_forca_ativos.add(channel_id)
 
-        def check(m):
-            return m.channel == interaction.channel and len(m.content) == 1 and m.content.isalpha()
+        try:
+            cat = categoria.value if categoria else "geral"
+            banco_forca = TEXTOS.get("forca", {})
+            lista_palavras = banco_forca.get(cat, banco_forca.get("geral", ["DISCORD"]))
+            
+            palavra = random.choice(lista_palavras).upper()
+            letras_descobertas = set()
+            tentativas = 6
 
-        while tentativas > 0:
-            try:
-                msg = await self.bot.wait_for("message", check=check, timeout=30.0)
-            except asyncio.TimeoutError:
-                await interaction.followup.send("⏳ Tempo esgotado! O jogo da forca foi encerrado.")
-                return
+            def formatar_palavra():
+                return " ".join([l if l in letras_descobertas else "\\_" for l in palavra])
 
-            letra = msg.content.upper()
-            if letra in letras_descobertas:
-                continue
+            await interaction.response.send_message(
+                f"🎮 **Jogo da Forca iniciado!**\nPalavra: {formatar_palavra()}\nTentativas restantes: `{tentativas}`"
+            )
 
-            letras_descobertas.add(letra)
+            def check(m):
+                return m.channel == interaction.channel and len(m.content) == 1 and m.content.isalpha()
 
-            if letra in palavra:
-                if set(palavra).issubset(letras_descobertas):
-                    await interaction.channel.send(f"🏆 **Vitória!** {msg.author.mention} acertou a palavra **{palavra}**!")
+            while tentativas > 0:
+                try:
+                    msg = await self.bot.wait_for("message", check=check, timeout=30.0)
+                except asyncio.TimeoutError:
+                    await interaction.channel.send("⏳ Tempo esgotado! O jogo da forca foi encerrado.")
                     return
-                await interaction.channel.send(f"✅ Letra `{letra}` encontrada!\nPalavra: {formatar_palavra()}")
-            else:
-                tentativas -= 1
-                await interaction.channel.send(f"❌ Letra `{letra}` incorreta.\nPalavra: {formatar_palavra()}\nTentativas: `{tentativas}`")
 
-        await interaction.channel.send(f"💀 **Game Over!** A palavra era **{palavra}**.")
+                letra = msg.content.upper()
+                if letra in letras_descobertas:
+                    continue
+
+                letras_descobertas.add(letra)
+
+                if letra in palavra:
+                    if set(palavra).issubset(letras_descobertas):
+                        await interaction.channel.send(f"🏆 **Vitória!** {msg.author.mention} acertou a palavra **{palavra}**!")
+                        return
+                    await interaction.channel.send(f"✅ Letra `{letra}` encontrada!\nPalavra: {formatar_palavra()}")
+                else:
+                    tentativas -= 1
+                    await interaction.channel.send(f"❌ Letra `{letra}` incorreta.\nPalavra: {formatar_palavra()}\nTentativas: `{tentativas}`")
+
+            await interaction.channel.send(f"💀 **Game Over!** A palavra era **{palavra}**.")
+
+        finally:
+            # Libera o canal para um novo jogo ao encerrar (por vitória, derrota ou tempo)
+            self.jogos_forca_ativos.discard(channel_id)
 
     # 4. BLACKJACK / 21
     @app_commands.command(name="21", description="Aposte seus Golds no Blackjack (21).")
