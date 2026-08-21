@@ -6,36 +6,7 @@ import time
 import discord
 from discord.ext import commands
 from discord import app_commands
-import economy  # Certifique-se de que o economy.py está na mesma pasta
-import random
-
-# Exemplo dentro da função/comando de batalha no pets_rpg.py:
-dados_rpg = load_json("config_rpg.json", {})
-pet = obter_pet_com_buffs(user_id, dados_rpg)
-
-if not pet:
-    await interaction.response.send_message("❌ Você ainda não possui um pet!", ephemeral=True)
-    return
-
-# Chance base de vitória é 50% (0.50) + Bônus de sorte (ex: 0.20)
-chance_vitoria = 0.50 + pet.get("sorte_bonus", 0.0)
-
-if random.random() <= chance_vitoria:
-    # VITÓRIA: XP ganho multiplicado pelo bônus
-    xp_base = 40
-    xp_final = int(xp_base * pet.get("bonus_xp", 1.0))
-    
-    pet["xp"] += xp_final
-    pet["vitorias"] = pet.get("vitorias", 0) + 1
-    save_json("config_rpg.json", dados_rpg)
-    
-    msg = f"⚔️ **Vitória!** Seu pet **{pet['nome']}** ganhou **+{xp_final} XP**!"
-    if pet.get("bonus_xp", 1.0) > 1.0:
-        msg += f" *(XP x{pet['bonus_xp']} Ativo)*"
-else:
-    msg = f"❌ **Derrota!** O inimigo se defendeu e venceu o combate."
-
-await interaction.response.send_message(msg)
+import economy
 
 DB_RPG = "config_rpg.json"
 
@@ -45,14 +16,14 @@ CANAL_ESPECIFICO_ID = 1538229136898662500
 
 # Tabela Padrão de Ranks com Cores e Benefícios (Bônus de Gold e Desconto na Loja)
 RANKS_PADRAO = {
-    "Rank F": {"nivel_req": 20, "cor": "#CD7F32", "cargo_id": None, "bonus_gold": 1.05, "desconto": 0.0, "cd_explorar": 60},   # +5% Gold
-    "Rank E": {"nivel_req": 35, "cor": "#A0522D", "cargo_id": None, "bonus_gold": 1.10, "desconto": 0.05, "cd_explorar": 55},  # +10% Gold, 5% Off
-    "Rank D": {"nivel_req": 50, "cor": "#C0C0C0", "cargo_id": None, "bonus_gold": 1.15, "desconto": 0.10, "cd_explorar": 50},  # +15% Gold, 10% Off
-    "Rank C": {"nivel_req": 65, "cor": "#E6E8FA", "cargo_id": None, "bonus_gold": 1.20, "desconto": 0.15, "cd_explorar": 45},  # +20% Gold, 15% Off
-    "Rank B": {"nivel_req": 80, "cor": "#FFD700", "cargo_id": None, "bonus_gold": 1.25, "desconto": 0.20, "cd_explorar": 40},  # +25% Gold, 20% Off
-    "Rank A": {"nivel_req": 100, "cor": "#FFA500", "cargo_id": None, "bonus_gold": 1.30, "desconto": 0.25, "cd_explorar": 35}, # +30% Gold, 25% Off
-    "Rank S": {"nivel_req": 130, "cor": "#9400D3", "cargo_id": None, "bonus_gold": 1.40, "desconto": 0.30, "cd_explorar": 30}, # +40% Gold, 30% Off
-    "Rank SS": {"nivel_req": 160, "cor": "#FF007F", "cargo_id": None, "bonus_gold": 1.50, "desconto": 0.35, "cd_explorar": 25} # +50% Gold, 35% Off
+    "Rank F": {"nivel_req": 20, "cor": "#CD7F32", "cargo_id": None, "bonus_gold": 1.05, "desconto": 0.0, "cd_explorar": 60},
+    "Rank E": {"nivel_req": 35, "cor": "#A0522D", "cargo_id": None, "bonus_gold": 1.10, "desconto": 0.05, "cd_explorar": 55},
+    "Rank D": {"nivel_req": 50, "cor": "#C0C0C0", "cargo_id": None, "bonus_gold": 1.15, "desconto": 0.10, "cd_explorar": 50},
+    "Rank C": {"nivel_req": 65, "cor": "#E6E8FA", "cargo_id": None, "bonus_gold": 1.20, "desconto": 0.15, "cd_explorar": 45},
+    "Rank B": {"nivel_req": 80, "cor": "#FFD700", "cargo_id": None, "bonus_gold": 1.25, "desconto": 0.20, "cd_explorar": 40},
+    "Rank A": {"nivel_req": 100, "cor": "#FFA500", "cargo_id": None, "bonus_gold": 1.30, "desconto": 0.25, "cd_explorar": 35},
+    "Rank S": {"nivel_req": 130, "cor": "#9400D3", "cargo_id": None, "bonus_gold": 1.40, "desconto": 0.30, "cd_explorar": 30},
+    "Rank SS": {"nivel_req": 160, "cor": "#FF007F", "cargo_id": None, "bonus_gold": 1.50, "desconto": 0.35, "cd_explorar": 25}
 }
 
 def load_rpg_db():
@@ -86,8 +57,27 @@ def save_rpg_db(data):
     with open(DB_RPG, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
+def obter_pet_com_buffs(user_id: str, db: dict):
+    """Carrega o pet e valida a expiração de buffs temporários de sorte e XP."""
+    pet = db.get("pets", {}).get(user_id)
+    if not pet:
+        return None
+
+    pet.setdefault("sorte_bonus", 0.0)
+    pet.setdefault("bonus_xp", 1.0)
+    pet.setdefault("buff_expira_em", None)
+
+    if pet["buff_expira_em"]:
+        data_expira = datetime.datetime.fromisoformat(pet["buff_expira_em"])
+        if datetime.datetime.now() > data_expira:
+            pet["sorte_bonus"] = 0.0
+            pet["bonus_xp"] = 1.0
+            pet["buff_expira_em"] = None
+            save_rpg_db(db)
+
+    return pet
+
 def obter_beneficios_pet(nivel_pet: int, db: dict):
-    """Calcula e retorna os bônus ativos de acordo com o nível do pet e o Rank alcançado."""
     ranks = db.get("ranks_aventureiro", {})
     beneficios = {"bonus_gold": 1.0, "desconto": 0.0, "cd_explorar": 60, "rank_nome": "Iniciante"}
 
@@ -103,7 +93,6 @@ def obter_beneficios_pet(nivel_pet: int, db: dict):
     return beneficios
 
 async def checar_promocao_rank(member: discord.Member, nivel_pet: int, db: dict):
-    """Verifica e atualiza o cargo de Rank de Aventureiro do jogador de acordo com o nível do pet."""
     ranks = db.get("ranks_aventureiro", {})
     if not ranks or not member or not member.guild:
         return None
@@ -281,6 +270,9 @@ class PetRPG(commands.Cog):
             "vida": 100,
             "vitorias": 0,
             "convite_enviado": False,
+            "sorte_bonus": 0.0,
+            "bonus_xp": 1.0,
+            "buff_expira_em": None,
             "inventario": {"cura": 0, "racao": 0, "elixir": 0, "amuleto": 0},
             "stats": {
                 "hp_atual": 100,
@@ -305,11 +297,11 @@ class PetRPG(commands.Cog):
         
         db = load_rpg_db()
         user_id = str(interaction.user.id)
+        pet = obter_pet_com_buffs(user_id, db)
 
-        if user_id not in db["pets"]:
+        if not pet:
             return await interaction.followup.send("⚠️ Você ainda não tem um pet! Use `/pet_adotar` primeiro.")
 
-        pet = db["pets"][user_id]
         stats = pet.get("stats", {"hp_atual": pet.get("vida", 100), "hp_max": pet.get("vida", 100), "atq": 25, "defesa": 10, "agi": 10})
         beneficios = obter_beneficios_pet(pet.get("nivel", 1), db)
 
@@ -328,7 +320,11 @@ class PetRPG(commands.Cog):
         
         b_gold = int((beneficios['bonus_gold'] - 1.0) * 100)
         b_desc = int(beneficios['desconto'] * 100)
+        
+        buff_txt = f"🍀 `+{int(pet.get('sorte_bonus', 0.0)*100)}% Sorte` | 📈 `{pet.get('bonus_xp', 1.0)}x XP`" if pet.get('bonus_xp', 1.0) > 1.0 or pet.get('sorte_bonus', 0.0) > 0 else "Nenhum buff ativo"
+        
         embed.add_field(name="Bônus de Rank", value=f"🪙 `+{b_gold}% Gold` | 🛒 `{b_desc}% Off na Loja`", inline=False)
+        embed.add_field(name="Buffs Ativos", value=buff_txt, inline=False)
 
         await interaction.followup.send(embed=embed)
 
@@ -421,22 +417,6 @@ class PetRPG(commands.Cog):
         
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-        if custo >= 250:
-            try:
-                log_channel = discord.utils.get(interaction.guild.text_channels, name="📡・bot-logs")
-                if log_channel:
-                    log_embed = discord.Embed(
-                        title="📊 Log de Economia / Loja",
-                        description=f"O usuário **{interaction.user}** (`{interaction.user.id}`) comprou um item de alto valor.",
-                        color=discord.Color.orange()
-                    )
-                    log_embed.add_field(name="Item", value=item.name, inline=True)
-                    log_embed.add_field(name="Valor Gasto", value=f"{custo} Golds", inline=True)
-                    log_embed.set_timestamp()
-                    await log_channel.send(embed=log_embed)
-            except Exception as e:
-                print(f"Erro ao enviar log de loja: {e}")
-
     @app_commands.command(name="foguinho", description="Testa sua sorte no clássico jogo do foguinho apostando Golds.")
     @app_commands.describe(aposta="Quantidade de Golds que você deseja apostar")
     async def foguinho(self, interaction: discord.Interaction, aposta: int):
@@ -488,38 +468,47 @@ class PetRPG(commands.Cog):
 
         db = load_rpg_db()
         user_id = str(interaction.user.id)
+        pet = obter_pet_com_buffs(user_id, db)
 
-        if user_id not in db["pets"]:
+        if not pet:
             return await interaction.followup.send("⚠️ Você precisa de um pet para entrar na masmorra! Use `/pet_adotar`.")
 
         monstros = ["Goblin das Cavernas", "Lobisomem Sombrio", "Dragão Menor", "Esqueleto Guerreiro"]
         monstro_escolhido = random.choice(monstros)
-        vitoria = random.choice([True, False])
+
+        # Aplicando a Sorte Extra
+        chance_vitoria = 0.50 + pet.get("sorte_bonus", 0.0)
+        vitoria = random.random() <= chance_vitoria
 
         if vitoria:
-            beneficios = obter_beneficios_pet(db["pets"][user_id].get("nivel", 1), db)
+            beneficios = obter_beneficios_pet(pet.get("nivel", 1), db)
             recompensa_base = random.randint(50, 200)
             recompensa_gold = int(recompensa_base * beneficios["bonus_gold"])
             
+            # Aplicando Multiplicador de XP
+            xp_base = 35
+            xp_ganho = int(xp_base * pet.get("bonus_xp", 1.0))
+
             economy.add_gold(interaction.user.id, recompensa_gold)
-            db["pets"][user_id]["vitorias"] = db["pets"][user_id].get("vitorias", 0) + 1
-            db["pets"][user_id]["xp"] = db["pets"][user_id].get("xp", 0) + 35
+            pet["vitorias"] = pet.get("vitorias", 0) + 1
+            pet["xp"] = pet.get("xp", 0) + xp_ganho
 
             lvl_up_txt = ""
-            if db["pets"][user_id]["xp"] >= 150:
-                db["pets"][user_id]["nivel"] = db["pets"][user_id].get("nivel", 1) + 1
-                db["pets"][user_id]["xp"] -= 150
+            if pet["xp"] >= 150:
+                pet["nivel"] = pet.get("nivel", 1) + 1
+                pet["xp"] -= 150
                 lvl_up_txt = "\n🎉 **Seu pet subiu de nível!**"
 
             save_rpg_db(db)
 
-            promocao = await checar_promocao_rank(interaction.user, db["pets"][user_id]["nivel"], db)
+            promocao = await checar_promocao_rank(interaction.user, pet["nivel"], db)
 
-            txt_bonus = f" *(+{int((beneficios['bonus_gold']-1)*100)}% de Bônus de Rank)*" if beneficios['bonus_gold'] > 1.0 else ""
+            txt_bonus = f" *(+{int((beneficios['bonus_gold']-1)*100)}% Bônus de Rank)*" if beneficios['bonus_gold'] > 1.0 else ""
+            txt_xp = f" *(XP x{pet['bonus_xp']} Ativo)*" if pet.get("bonus_xp", 1.0) > 1.0 else ""
 
             embed = discord.Embed(
                 title="⚔️ Vitória na Masmorra!",
-                description=f"Seu pet derrotou um **{monstro_escolhido}**!\n\n💰 Recompensa: **{recompensa_gold:,} Golds**{txt_bonus}{lvl_up_txt}",
+                description=f"Seu pet derrotou um **{monstro_escolhido}**!\n\n💰 Recompensa: **{recompensa_gold:,} Golds**{txt_bonus}\n✨ **XP Ganho:** `+{xp_ganho} XP`{txt_xp}{lvl_up_txt}",
                 color=discord.Color.green()
             )
             if promocao:
@@ -618,11 +607,10 @@ class PetRPG(commands.Cog):
 
         db = load_rpg_db()
         user_id = str(interaction.user.id)
+        pet = obter_pet_com_buffs(user_id, db)
 
-        if user_id not in db["pets"]:
+        if not pet:
             return await interaction.followup.send("⚠️ Você precisa de um pet para explorar! Use `/pet_adotar` primeiro.", ephemeral=True)
-
-        pet = db["pets"][user_id]
 
         if pet.get("nivel", 1) < 20:
             return await interaction.followup.send(
@@ -686,13 +674,20 @@ class PetRPG(commands.Cog):
 
         if evento_perigo:
             monstro = random.choice(info["mobs"])
-            chance_vitoria = min(0.35 + (pet.get("nivel", 1) * 0.02), 0.75)  
-            vitoria = random.random() < chance_vitoria
+            
+            # Sorte Bônus aplicada na chance de vitória
+            chance_base = min(0.35 + (pet.get("nivel", 1) * 0.02), 0.75)
+            chance_vitoria = chance_base + pet.get("sorte_bonus", 0.0)
+            
+            vitoria = random.random() <= chance_vitoria
 
             if vitoria:
                 ouro_base = random.randint(15 * pet.get("nivel", 1), 40 * pet.get("nivel", 1))
                 ouro_ganho = int(ouro_base * beneficios["bonus_gold"])
-                xp_ganho = random.randint(15, 35)
+                
+                # Multiplicador de XP aplicado
+                xp_base = random.randint(15, 35)
+                xp_ganho = int(xp_base * pet.get("bonus_xp", 1.0))
                 
                 economy.add_gold(interaction.user.id, ouro_ganho)
                 
@@ -711,13 +706,14 @@ class PetRPG(commands.Cog):
                 promocao = await checar_promocao_rank(interaction.user, pet["nivel"], db)
 
                 txt_bonus = f" *(+{int((beneficios['bonus_gold']-1)*100)}% Bônus de Rank)*" if beneficios['bonus_gold'] > 1.0 else ""
+                txt_xp = f" *(XP x{pet['bonus_xp']} Ativo)*" if pet.get("bonus_xp", 1.0) > 1.0 else ""
 
                 embed = discord.Embed(
-                    title=f"⚔️ Vitória Difícil em {info['nome']}!",
+                    title=f"⚔️ Vitória em {info['nome']}!",
                     description=(
                         f"Após um combate duríssimo, seu pet superou o feroz **{monstro}**!\n\n"
                         f"💰 **Recompensa:** `{ouro_ganho:,}` Golds{txt_bonus}\n"
-                        f"✨ **XP Obtido:** `+{xp_ganho} XP`"
+                        f"✨ **XP Obtido:** `+{xp_ganho} XP`{txt_xp}"
                         f"{' \n\n🎉 **LEVEL UP! Seu pet alcançou o nível ' + str(pet['nivel']) + '!**' if lvl_up else ''}"
                     ),
                     color=discord.Color.green()
@@ -743,7 +739,9 @@ class PetRPG(commands.Cog):
             ouro_base = random.randint(10, 25)
             ouro_ganho = int(ouro_base * beneficios["bonus_gold"])
             economy.add_gold(interaction.user.id, ouro_ganho)
-            pet["xp"] = pet.get("xp", 0) + 10
+            
+            xp_ganho = int(10 * pet.get("bonus_xp", 1.0))
+            pet["xp"] = pet.get("xp", 0) + xp_ganho
             
             save_rpg_db(db)
 
@@ -752,7 +750,7 @@ class PetRPG(commands.Cog):
                 description=(
                     f"Por sorte, nenhum monstro mortal atacou. Seu pet encontrou restos de provisões:\n\n"
                     f"💰 **Achado:** `{ouro_ganho}` Golds\n"
-                    f"✨ **Experiência:** `+10 XP`"
+                    f"✨ **Experiência:** `+{xp_ganho} XP`"
                 ),
                 color=info["cor"]
             )
@@ -791,3 +789,4 @@ class PetRPG(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(PetRPG(bot))
+            
