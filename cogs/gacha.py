@@ -36,7 +36,6 @@ def adicionar_personagem(user_id: int, personagem: dict):
     if user_str not in harem:
         harem[user_str] = []
     
-    # Evita duplicatas do mesmo personagem para o mesmo usuário
     if not any(p.get("mal_id") == personagem.get("mal_id") for p in harem[user_str]):
         harem[user_str].append(personagem)
         salvar_harem(harem)
@@ -46,7 +45,6 @@ def adicionar_personagem(user_id: int, personagem: dict):
 def obter_harem_usuario(user_id: int) -> list:
     harem = carregar_harem()
     return harem.get(str(user_id), [])
-
 
 # --- VIEW DO COMANDO ROLL ---
 class ReivindicarView(discord.ui.View):
@@ -71,64 +69,72 @@ class ReivindicarView(discord.ui.View):
         else:
             await interaction.response.send_message("❌ Você já possui este personagem no seu harém!", ephemeral=True)
 
-
 # --- COG DE GACHA ---
 class Gacha(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     @app_commands.command(name="roll", description="Sorteie um personagem de anime aleatório!")
-    @app_commands.checks.cooldown(1, 300, key=lambda i: (i.user.id)) # Cooldown de 5 min por usuário
+    @app_commands.checks.cooldown(1, 300, key=lambda i: (i.user.id))
     async def roll(self, interaction: discord.Interaction):
         await interaction.response.defer()
         
-        # Faz a requisição para a API do Jikan (MyAnimeList)
         pagina_aleatoria = random.randint(1, 100)
         url = f"https://api.jikan.moe/v4/top/characters?page={pagina_aleatoria}"
         
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as resp:
-                if resp.status != 200:
-                    await interaction.followup.send("⚠️ Erro ao buscar personagens no momento. Tente novamente!")
-                    return
-                
-                data = await resp.json()
-                personagens = data.get("data", [])
-                
-                if not personagens:
-                    await interaction.followup.send("⚠️ Nenhum personagem encontrado. Tente novamente!")
-                    return
-                
-                p_data = random.choice(personagens)
-                
-                personagem = {
-                    "mal_id": p_data.get("mal_id"),
-                    "name": p_data.get("name"),
-                    "image": p_data.get("images", {}).get("jpg", {}).get("image_url"),
-                    "url": p_data.get("url")
-                }
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as resp:
+                    if resp.status == 429:
+                        await interaction.followup.send("⏳ A API de animes está sobrecarregada no momento. Tente novamente em alguns segundos!")
+                        return
+                    if resp.status != 200:
+                        await interaction.followup.send("⚠️ Erro ao buscar personagens no momento. Tente novamente!")
+                        return
+                    
+                    data = await resp.json()
+                    personagens = data.get("data", [])
+                    
+                    if not personagens:
+                        await interaction.followup.send("⚠️ Nenhum personagem encontrado. Tente novamente!")
+                        return
+                    
+                    p_data = random.choice(personagens)
+                    
+                    personagem = {
+                        "mal_id": p_data.get("mal_id"),
+                        "name": p_data.get("name"),
+                        "image": p_data.get("images", {}).get("jpg", {}).get("image_url"),
+                        "url": p_data.get("url")
+                    }
 
-        embed = discord.Embed(
-            title=f"✨ {personagem['name']}",
-            url=personagem["url"],
-            color=discord.Color.purple()
-        )
-        if personagem["image"]:
-            embed.set_image(url=personagem["image"])
-            
-        embed.set_footer(text="Clique no botão abaixo para reivindicar!")
+            embed = discord.Embed(
+                title=f"✨ {personagem['name']}",
+                url=personagem["url"],
+                color=discord.Color.purple()
+            )
+            if personagem["image"]:
+                embed.set_image(url=personagem["image"])
+                
+            embed.set_footer(text="Clique no botão abaixo para reivindicar!")
 
-        view = ReivindicarView(personagem)
-        await interaction.followup.send(embed=embed, view=view)
+            view = ReivindicarView(personagem)
+            await interaction.followup.send(embed=embed, view=view)
+
+        except Exception as e:
+            await interaction.followup.send(f"❌ Erro ao realizar o roll: `{e}`")
 
     @roll.error
     async def roll_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.CommandOnCooldown):
             minutos = int(error.retry_after // 60)
             segundos = int(error.retry_after % 60)
-            await interaction.response.send_message(
-                f"⏳ Aguarde **{minutos}m {segundos}s** para dar outro roll!", ephemeral=True
-            )
+            msg = f"⏳ Aguarde **{minutos}m {segundos}s** para dar outro roll!"
+            
+            if interaction.response.is_done():
+                await interaction.followup.send(msg, ephemeral=True)
+            else:
+                await interaction.response.send_message(msg, ephemeral=True)
 
     @app_commands.command(name="harem", description="Veja sua coleção de personagens.")
     async def harem(self, interaction: discord.Interaction, membro: discord.Member = None):
@@ -151,7 +157,6 @@ class Gacha(commands.Cog):
             embed.set_footer(text=f"E mais {len(colecao) - 15} personagens...")
             
         await interaction.response.send_message(embed=embed)
-
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Gacha(bot))
