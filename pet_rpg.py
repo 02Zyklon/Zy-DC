@@ -45,7 +45,7 @@ def save_rpg_db(data):
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 def corrigir_dados_pet(pet: dict) -> dict:
-    """Higieniza os dados do pet contra corrupção (dicionários no lugar de ints)"""
+    """Higieniza os dados do pet contra corrupção"""
     for chave in ["nivel", "xp", "vida", "vitorias"]:
         if isinstance(pet.get(chave), dict) or pet.get(chave) is None:
             pet[chave] = 1 if chave == "nivel" else 0
@@ -76,7 +76,7 @@ def obter_pet_com_buffs(user_id: str, db: dict):
     pet = db.get("pets", {}).get(user_id)
     if not pet: return None
 
-    pet = corrigir_dados_pet(pet) # <--- BLINDAGEM APLICADA AQUI
+    pet = corrigir_dados_pet(pet)
 
     if pet.get("buff_expira_em"):
         try:
@@ -130,7 +130,6 @@ async def checar_promocao_rank(member: discord.Member, nivel_pet: int, db: dict)
         print(f"Erro ao atribuir rank: {e}")
         return None
 
-
 class AventureiroConfirmView(discord.ui.View):
     def __init__(self, cargo_aventureiro_id: int, canal_liberar_id: int):
         super().__init__(timeout=180)
@@ -171,10 +170,27 @@ class AventureiroConfirmView(discord.ui.View):
         
         await interaction.response.edit_message(content="❌ Oferta recusada. Quando mudar de ideia, você poderá tentar novamente!", embed=None, view=self)
 
-
 class PetRPG(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
+    # Tratamento global de erros de cooldown para este Cog
+    async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, app_commands.CommandOnCooldown):
+            horas = int(error.retry_after // 3600)
+            minutos = int((error.retry_after % 3600) // 60)
+            segundos = int(error.retry_after % 60)
+
+            tempo_str = ""
+            if horas > 0: tempo_str += f"{horas}h "
+            if minutos > 0: tempo_str += f"{minutos}m "
+            tempo_str += f"{segundos}s"
+
+            msg = f"⏳ Aguarde **{tempo_str}** para usar este comando novamente!"
+            if interaction.response.is_done():
+                await interaction.followup.send(msg, ephemeral=True)
+            else:
+                await interaction.response.send_message(msg, ephemeral=True)
 
     @app_commands.command(name="setup_ranks", description="[Admin] Cria os cargos de Rank de Aventureiro no Discord e salva no config_rpg.json.")
     @app_commands.checks.has_permissions(administrator=True)
@@ -482,7 +498,6 @@ class PetRPG(commands.Cog):
         monstros = ["Goblin das Cavernas", "Lobisomem Sombrio", "Dragão Menor", "Esqueleto Guerreiro"]
         monstro_escolhido = random.choice(monstros)
 
-        # Aplicando a Sorte Extra
         chance_vitoria = 0.50 + pet.get("sorte_bonus", 0.0)
         vitoria = random.random() <= chance_vitoria
 
@@ -491,7 +506,6 @@ class PetRPG(commands.Cog):
             recompensa_base = random.randint(50, 200)
             recompensa_gold = int(recompensa_base * beneficios["bonus_gold"])
             
-            # Aplicando Multiplicador de XP
             xp_base = 35
             xp_ganho = int(xp_base * pet.get("bonus_xp", 1.0))
 
@@ -500,10 +514,10 @@ class PetRPG(commands.Cog):
             pet["xp"] = pet.get("xp", 0) + xp_ganho
 
             lvl_up_txt = ""
-            if pet["xp"] >= 150:
+            while pet["xp"] >= 150:
                 pet["nivel"] = pet.get("nivel", 1) + 1
                 pet["xp"] -= 150
-                lvl_up_txt = "\n🎉 **Seu pet subiu de nível!**"
+                lvl_up_txt = f"\n🎉 **Seu pet subiu para o nível {pet['nivel']}!**"
 
             save_rpg_db(db)
 
@@ -682,7 +696,6 @@ class PetRPG(commands.Cog):
         if evento_perigo:
             monstro = random.choice(info["mobs"])
             
-            # Sorte Bônus aplicada na chance de vitória
             chance_base = min(0.35 + (pet.get("nivel", 1) * 0.02), 0.75)
             chance_vitoria = chance_base + pet.get("sorte_bonus", 0.0)
             
@@ -692,7 +705,6 @@ class PetRPG(commands.Cog):
                 ouro_base = random.randint(15 * pet.get("nivel", 1), 40 * pet.get("nivel", 1))
                 ouro_ganho = int(ouro_base * beneficios["bonus_gold"])
                 
-                # Multiplicador de XP aplicado
                 xp_base = random.randint(15, 35)
                 xp_ganho = int(xp_base * pet.get("bonus_xp", 1.0))
                 
@@ -714,7 +726,6 @@ class PetRPG(commands.Cog):
 
                 promocao = await checar_promocao_rank(interaction.user, pet["nivel"], db)
 
-                # Checa se subiu/está nível >= 20 para enviar o convite uma única vez
                 if pet.get("nivel", 1) >= 20 and not pet.get("convite_enviado", False):
                     pet["convite_enviado"] = True
                     disparar_convite = True
