@@ -10,7 +10,6 @@ from datetime import datetime, timedelta
 from discord.ext import commands
 from discord import app_commands
 from keep_alive import keep_alive
-import economy
 
 # =========================================================
 # CONFIGURAÇÃO DE LOGS
