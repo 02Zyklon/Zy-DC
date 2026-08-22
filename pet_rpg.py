@@ -2,19 +2,15 @@ import os
 import json
 import random
 import datetime
-import time
 import discord
 from discord.ext import commands
 from discord import app_commands
 import economy
 
 DB_RPG = "config_rpg.json"
-
-# IDs configurados para o sistema de Aventureiro
 CARGO_AVENTUREIRO_ID = 1538666697849045092
 CANAL_ESPECIFICO_ID = 1538229136898662500
 
-# Tabela Padrão de Ranks com Cores e Benefícios (Bônus de Gold e Desconto na Loja)
 RANKS_PADRAO = {
     "Rank F": {"nivel_req": 20, "cor": "#CD7F32", "cargo_id": None, "bonus_gold": 1.05, "desconto": 0.0, "cd_explorar": 60},
     "Rank E": {"nivel_req": 35, "cor": "#A0522D", "cargo_id": None, "bonus_gold": 1.10, "desconto": 0.05, "cd_explorar": 55},
@@ -28,27 +24,18 @@ RANKS_PADRAO = {
 
 def load_rpg_db():
     default_data = {
-        "pets": {},
-        "masmorras": {},
+        "pets": {}, "masmorras": {},
         "boss_atual": {"nome": "Zé pilintra", "vida": 699903, "vida_max": 700000, "nivel": 1},
         "ranks_aventureiro": RANKS_PADRAO
     }
-    if not os.path.exists(DB_RPG):
-        return default_data
+    if not os.path.exists(DB_RPG): return default_data
     try:
         with open(DB_RPG, "r", encoding="utf-8") as f:
             conteudo = f.read().strip()
-            if not conteudo:
-                return default_data
+            if not conteudo: return default_data
             data = json.loads(conteudo)
-            if "pets" not in data:
-                data["pets"] = {}
-            if "masmorras" not in data:
-                data["masmorras"] = {}
-            if "boss_atual" not in data:
-                data["boss_atual"] = {"nome": "Zé pilintra", "vida": 699903, "vida_max": 700000, "nivel": 1}
-            if "ranks_aventureiro" not in data:
-                data["ranks_aventureiro"] = RANKS_PADRAO
+            for key in default_data:
+                if key not in data: data[key] = default_data[key]
             return data
     except Exception:
         return default_data
@@ -57,23 +44,50 @@ def save_rpg_db(data):
     with open(DB_RPG, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
+def corrigir_dados_pet(pet: dict) -> dict:
+    """Higieniza os dados do pet contra corrupção (dicionários no lugar de ints)"""
+    for chave in ["nivel", "xp", "vida", "vitorias"]:
+        if isinstance(pet.get(chave), dict) or pet.get(chave) is None:
+            pet[chave] = 1 if chave == "nivel" else 0
+        else:
+            try: pet[chave] = int(pet[chave])
+            except: pet[chave] = 1 if chave == "nivel" else 0
+            
+    for chave_f in ["sorte_bonus", "bonus_xp"]:
+        if isinstance(pet.get(chave_f), dict) or pet.get(chave_f) is None:
+            pet[chave_f] = 1.0 if chave_f == "bonus_xp" else 0.0
+        else:
+            try: pet[chave_f] = float(pet[chave_f])
+            except: pet[chave_f] = 1.0 if chave_f == "bonus_xp" else 0.0
+            
+    if "stats" not in pet or not isinstance(pet["stats"], dict):
+        pet["stats"] = {"hp_atual": 100, "hp_max": 100, "atq": 25, "defesa": 10, "agi": 10}
+    else:
+        for s in ["hp_atual", "hp_max", "atq", "defesa", "agi"]:
+            val = pet["stats"].get(s)
+            if isinstance(val, dict) or val is None:
+                pet["stats"][s] = 100 if "hp" in s else 10
+            else:
+                try: pet["stats"][s] = int(val)
+                except: pet["stats"][s] = 100 if "hp" in s else 10
+    return pet
+
 def obter_pet_com_buffs(user_id: str, db: dict):
-    """Carrega o pet e valida a expiração de buffs temporários de sorte e XP."""
     pet = db.get("pets", {}).get(user_id)
-    if not pet:
-        return None
+    if not pet: return None
 
-    pet.setdefault("sorte_bonus", 0.0)
-    pet.setdefault("bonus_xp", 1.0)
-    pet.setdefault("buff_expira_em", None)
+    pet = corrigir_dados_pet(pet) # <--- BLINDAGEM APLICADA AQUI
 
-    if pet["buff_expira_em"]:
-        data_expira = datetime.datetime.fromisoformat(pet["buff_expira_em"])
-        if datetime.datetime.now() > data_expira:
-            pet["sorte_bonus"] = 0.0
-            pet["bonus_xp"] = 1.0
+    if pet.get("buff_expira_em"):
+        try:
+            data_expira = datetime.datetime.fromisoformat(pet["buff_expira_em"])
+            if datetime.datetime.now() > data_expira:
+                pet["sorte_bonus"] = 0.0
+                pet["bonus_xp"] = 1.0
+                pet["buff_expira_em"] = None
+                save_rpg_db(db)
+        except:
             pet["buff_expira_em"] = None
-            save_rpg_db(db)
 
     return pet
 
@@ -84,44 +98,36 @@ def obter_beneficios_pet(nivel_pet: int, db: dict):
     for nome_rank, info in ranks.items():
         if nivel_pet >= info.get("nivel_req", 999):
             beneficios = {
-                "bonus_gold": info.get("bonus_gold", 1.0),
-                "desconto": info.get("desconto", 0.0),
-                "cd_explorar": info.get("cd_explorar", 60),
+                "bonus_gold": float(info.get("bonus_gold", 1.0)),
+                "desconto": float(info.get("desconto", 0.0)),
+                "cd_explorar": int(info.get("cd_explorar", 60)),
                 "rank_nome": nome_rank
             }
-
     return beneficios
 
 async def checar_promocao_rank(member: discord.Member, nivel_pet: int, db: dict):
     ranks = db.get("ranks_aventureiro", {})
-    if not ranks or not member or not member.guild:
-        return None
+    if not ranks or not member or not getattr(member, 'guild', None): return None
 
-    rank_alcancado_nome = None
-    rank_alcancado_info = None
-
+    rank_alcancado_nome, rank_alcancado_info = None, None
     for nome_rank, info in ranks.items():
         if nivel_pet >= info.get("nivel_req", 999):
-            rank_alcancado_nome = nome_rank
-            rank_alcancado_info = info
+            rank_alcancado_nome, rank_alcancado_info = nome_rank, info
 
-    if not rank_alcancado_info or not rank_alcancado_info.get("cargo_id"):
-        return None
+    if not rank_alcancado_info or not rank_alcancado_info.get("cargo_id"): return None
 
     cargo_novo = member.guild.get_role(rank_alcancado_info["cargo_id"])
-    if not cargo_novo or cargo_novo in member.roles:
-        return None
+    if not cargo_novo or cargo_novo in member.roles: return None
 
     todos_cargos_ids = [info["cargo_id"] for info in ranks.values() if info.get("cargo_id")]
     cargos_para_remover = [role for role in member.roles if role.id in todos_cargos_ids]
 
     try:
-        if cargos_para_remover:
-            await member.remove_roles(*cargos_para_remover)
+        if cargos_para_remover: await member.remove_roles(*cargos_para_remover)
         await member.add_roles(cargo_novo)
         return (rank_alcancado_nome, cargo_novo)
     except Exception as e:
-        print(f"Erro ao atribuir rank para {member.display_name}: {e}")
+        print(f"Erro ao atribuir rank: {e}")
         return None
 
 
