@@ -4,7 +4,6 @@ import asyncio
 
 CAMINHO_BANCO = "database_golds.json"
 
-# Trava de segurança para impedir acessos simultâneos ao mesmo arquivo
 _lock = asyncio.Lock()
 
 def _carregar_dados_raw() -> dict:
@@ -27,31 +26,36 @@ def _salvar_dados_raw(dados: dict):
     except Exception as e:
         print(f"⚠️ Erro ao salvar {CAMINHO_BANCO}: {e}")
 
-# --- FUNÇÕES SÍNCRONAS (COMPATIBILIDADE) ---
+# --- FUNÇÕES SÍNCRONAS COM BLINDAGEM DE TIPOS ---
 def get_gold(user_id: int) -> int:
     dados = _carregar_dados_raw()
-    return dados.get(str(user_id), 0)
+    saldo = dados.get(str(user_id), 0)
+    # Se, por acaso, um dicionário ou lixo foi salvo, ele zera e força int
+    if isinstance(saldo, dict) or not isinstance(saldo, (int, float)):
+        return 0
+    return int(saldo)
 
 def add_gold(user_id: int, valor: int):
     dados = _carregar_dados_raw()
     user_str = str(user_id)
-    saldo_atual = dados.get(user_str, 0)
-    dados[user_str] = saldo_atual + valor
+    saldo_atual = get_gold(user_id) # Usa a função sanitizada
+    dados[user_str] = saldo_atual + int(valor)
     _salvar_dados_raw(dados)
 
 def remove_gold(user_id: int, valor: int) -> bool:
     dados = _carregar_dados_raw()
     user_str = str(user_id)
-    saldo_atual = dados.get(user_str, 0)
+    saldo_atual = get_gold(user_id)
+    valor_int = int(valor)
     
-    if saldo_atual < valor:
+    if saldo_atual < valor_int:
         return False
         
-    dados[user_str] = max(0, saldo_atual - valor)
+    dados[user_str] = max(0, saldo_atual - valor_int)
     _salvar_dados_raw(dados)
     return True
 
-# --- FUNÇÕES ASSÍNCRONAS COM LOCK (SEGURA CONTRA CORRUPÇÃO) ---
+# --- FUNÇÕES ASSÍNCRONAS ---
 async def get_gold_safe(user_id: int) -> int:
     async with _lock:
         return get_gold(user_id)
