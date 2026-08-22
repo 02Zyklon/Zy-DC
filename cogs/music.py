@@ -14,12 +14,13 @@ class Music(commands.Cog):
         self.bot.loop.create_task(self.conectar_node())
 
     async def conectar_node(self):
-        """Conecta ao servidor privado do Lavalink no Render."""
+        """Conecta ao servidor do Lavalink."""
         await self.bot.wait_until_ready()
         
+        # URI corrigido para http:// (Lavalink lida com WebSocket internamente)
         node = wavelink.Node(
             identifier="ZyklonRenderNode",
-            uri="https://lavalink-qvir.onrender.com",
+            uri="http://lavalink-qvir.onrender.com:80",
             password="$1N;ZyklonSS"
         )
         try:
@@ -33,6 +34,17 @@ class Music(commands.Cog):
         """Evento acionado quando o Node do Lavalink está pronto."""
         logger.info(f"🚀 Node Lavalink '{payload.node.identifier}' totalmente operacional!")
 
+    @commands.Cog.listener()
+    async def on_wavelink_track_end(self, payload: wavelink.TrackEndEventPayload):
+        """Toca a próxima música da fila automaticamente ao finalizar a atual."""
+        player: wavelink.Player = payload.player
+        if not player:
+            return
+
+        if not player.queue.is_empty:
+            next_track = await player.queue.get_wait()
+            await player.play(next_track)
+
     @commands.command(name="play", aliases=["p"], help="Toca uma música do YouTube ou Spotify")
     async def play(self, ctx: commands.Context, *, busca: str):
         if not ctx.author.voice:
@@ -44,17 +56,26 @@ class Music(commands.Cog):
             vc: wavelink.Player = ctx.voice_client
 
         try:
-            tracks: wavelink.Search = await wavelink.Playable.search(busca)
-            if not tracks:
+            # Busca faixas usando o provedor padrão do Wavelink
+            results: wavelink.Search = await wavelink.Playable.search(busca)
+            if not results:
                 return await ctx.send("❌ Nenhuma música encontrada com esse termo.")
 
-            track = tracks[0] if isinstance(tracks, list) else tracks.tracks[0]
-            await vc.queue.put_wait(track)
+            # Trata se for uma playlist ou apenas faixas individuais
+            if isinstance(results, wavelink.Playlist):
+                track = results.tracks[0]
+                for t in results.tracks:
+                    await vc.queue.put_wait(t)
+                await ctx.send(f"📚 Adicionada a playlist **{results.name}** ({len(results.tracks)} músicas) à fila!")
+            else:
+                track = results[0]
+                await vc.queue.put_wait(track)
 
             if not vc.playing:
-                await vc.play(vc.queue.get())
+                first_track = await vc.queue.get_wait()
+                await vc.play(first_track)
                 await ctx.send(f"🎵 Tocando agora: **{track.title}** - `{track.author}`")
-            else:
+            elif not isinstance(results, wavelink.Playlist):
                 await ctx.send(f"➕ Adicionado à fila: **{track.title}**")
 
         except Exception as e:
