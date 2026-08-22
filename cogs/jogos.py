@@ -268,6 +268,7 @@ class JogoDaVelhaView(discord.ui.View):
 class Jogos(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.jogos_forca_ativos = set()
 
     # 1. AKINATOR
     @app_commands.command(name="akinator", description="Desafie o Akinator para adivinhar seu personagem!")
@@ -291,10 +292,7 @@ class Jogos(commands.Cog):
         palavra_secreta = random.choice(lista_termo)
         await interaction.response.send_modal(TermoModal(palavra_secreta))
 
-# Conjunto para rastrear canais que já possuem um jogo da forca ativo
-    jogos_forca_ativos = set()
-
-    # 3. FORCA (CORRIGIDA COM CONTROLE DE SESSÃO)
+    # 3. FORCA
     @app_commands.command(name="forca", description="Jogo da forca no chat.")
     @app_commands.choices(categoria=[
         app_commands.Choice(name="Geral / Diversos", value="geral"),
@@ -304,7 +302,6 @@ class Jogos(commands.Cog):
     async def forca(self, interaction: discord.Interaction, categoria: app_commands.Choice[str] = None):
         channel_id = interaction.channel_id
 
-        # Verifica se já existe um jogo da forca rodando neste canal
         if channel_id in self.jogos_forca_ativos:
             await interaction.response.send_message(
                 "⚠️ Já existe um jogo da forca em andamento neste canal! Aguarde o término.", 
@@ -312,7 +309,6 @@ class Jogos(commands.Cog):
             )
             return
 
-        # Registra o canal como ativo
         self.jogos_forca_ativos.add(channel_id)
 
         try:
@@ -359,7 +355,6 @@ class Jogos(commands.Cog):
             await interaction.channel.send(f"💀 **Game Over!** A palavra era **{palavra}**.")
 
         finally:
-            # Libera o canal para um novo jogo ao encerrar (por vitória, derrota ou tempo)
             self.jogos_forca_ativos.discard(channel_id)
 
     # 4. BLACKJACK / 21
@@ -378,17 +373,11 @@ class Jogos(commands.Cog):
         await interaction.response.send_message(embed=view.gerar_embed(), view=view)
 
     # 5. ROLETA RUSSA
-    class Jogos(commands.Cog):
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
-        self.jogos_forca_ativos = set()
-
     @app_commands.command(name="roleta", description="Puxe o gatilho! Risco de tomar 1 min de timeout.")
     async def roleta(self, interaction: discord.Interaction):
         if random.randint(1, 6) == 1:
             await interaction.response.send_message(f"💥 **BANG!** {interaction.user.mention} deu azar e tomou um tiro! Silenciado por 1 minuto.")
             
-            # Blindagem: Garante que o interaction.user tem o método de timeout
             if isinstance(interaction.user, discord.Member):
                 try:
                     await interaction.user.timeout(datetime.timedelta(minutes=1), reason="Perdeu na Roleta Russa")
@@ -397,7 +386,7 @@ class Jogos(commands.Cog):
                 except Exception as e:
                     print(f"Erro ao aplicar timeout: {e}")
         else:
-            await interaction.response.send_message(f" *CLIQUE!* {interaction.user.mention} puxou o gatilho e a câmara estava vazia.")
+            await interaction.response.send_message(f"🎲 *CLIQUE!* {interaction.user.mention} puxou o gatilho e a câmara estava vazia.")
 
     # 6. CAÇA-NÍQUEIS
     @app_commands.command(name="slots", description="Aposte Golds no Caça-Níqueis.")
@@ -460,7 +449,7 @@ class Jogos(commands.Cog):
 
         await interaction.response.send_message(f"Você: `{user_choice}` vs Bot: `{bot_choice}`\n{res}")
 
-    # 10. ADIVINHAÇÃO
+    # 9. ADIVINHAÇÃO
     @app_commands.command(name="adivinhe", description="Tente adivinhar o número de 1 a 100.")
     async def adivinhe(self, interaction: discord.Interaction):
         numero = random.randint(1, 100)
@@ -487,7 +476,7 @@ class Jogos(commands.Cog):
 
         await interaction.channel.send(f"💀 Fim de tentativas! O número era **{numero}**.")
 
-    # 11. QUIZ
+    # 10. QUIZ
     @app_commands.command(name="quiz", description="Responda a uma pergunta do banco de dados.")
     async def quiz(self, interaction: discord.Interaction):
         lista_quiz = TEXTOS.get("quiz", [])
