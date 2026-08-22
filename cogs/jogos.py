@@ -378,14 +378,24 @@ class Jogos(commands.Cog):
         await interaction.response.send_message(embed=view.gerar_embed(), view=view)
 
     # 5. ROLETA RUSSA
+    class Jogos(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+        self.jogos_forca_ativos = set()
+
     @app_commands.command(name="roleta", description="Puxe o gatilho! Risco de tomar 1 min de timeout.")
     async def roleta(self, interaction: discord.Interaction):
         if random.randint(1, 6) == 1:
             await interaction.response.send_message(f"💥 **BANG!** {interaction.user.mention} deu azar e tomou um tiro! Silenciado por 1 minuto.")
-            try:
-                await interaction.user.timeout(datetime.timedelta(minutes=1), reason="Perdeu na Roleta Russa")
-            except Exception:
-                await interaction.followup.send("⚠️ Não tenho permissão para silenciar você neste servidor!", ephemeral=True)
+            
+            # Blindagem: Garante que o interaction.user tem o método de timeout
+            if isinstance(interaction.user, discord.Member):
+                try:
+                    await interaction.user.timeout(datetime.timedelta(minutes=1), reason="Perdeu na Roleta Russa")
+                except discord.Forbidden:
+                    await interaction.followup.send("⚠️ Não tenho permissão de Moderador superior à sua para te silenciar!", ephemeral=True)
+                except Exception as e:
+                    print(f"Erro ao aplicar timeout: {e}")
         else:
             await interaction.response.send_message(f" *CLIQUE!* {interaction.user.mention} puxou o gatilho e a câmara estava vazia.")
 
