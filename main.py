@@ -1052,9 +1052,17 @@ async def main():
             logging.info("🟢 Cog 'cogs.gacha' carregada!")
         except Exception as e:
             logging.error(f"⚠️ Erro ao carregar 'cogs.gacha': {e}")
+
+        # 5. Cog de Pokémon
+        try:
+            await bot.load_extension("cogs.pokemon")
+            logging.info("🟢 Cog 'cogs.pokemon' carregada!")
+        except Exception as e:
+            logging.error(f"⚠️ Erro ao carregar 'cogs.pokemon': {e}")
         
-        # 5. Inicia a sessão no Discord
+        # 6. Inicia a sessão no Discord
         await bot.start(token)
 
 if __name__ == "__main__":
     asyncio.run(main())
+    
