@@ -118,22 +118,52 @@ def save_json(file_path, data):
     except Exception as e:
         logging.error(f"Erro ao salvar {file_path}: {e}")
 
+def sanitizar_pet(pet):
+    """Garante que atributos numéricos do pet não sejam dicts nem None."""
+    if not isinstance(pet, dict):
+        return {}
+
+    for campo in ["xp", "nivel", "vitorias", "vida"]:
+        val = pet.get(campo, 0)
+        if isinstance(val, dict):
+            pet[campo] = val.get("value", 0) if isinstance(val.get("value"), (int, float)) else 0
+        elif not isinstance(val, int):
+            try:
+                pet[campo] = int(val)
+            except (ValueError, TypeError):
+                pet[campo] = 0
+
+    for campo_float in ["sorte_bonus", "bonus_xp"]:
+        val = pet.get(campo_float, 1.0)
+        if isinstance(val, dict):
+            pet[campo_float] = 1.0
+        elif not isinstance(val, (int, float)):
+            try:
+                pet[campo_float] = float(val)
+            except (ValueError, TypeError):
+                pet[campo_float] = 1.0
+
+    return pet
+
 def obter_pet_com_buffs(user_id: str, dados_rpg: dict):
     pet = dados_rpg.get("pets", {}).get(user_id)
     if not pet:
         return None
 
-    pet.setdefault("sorte_bonus", 0.0)
-    pet.setdefault("bonus_xp", 1.0)
+    pet = sanitizar_pet(pet)
+
     pet.setdefault("buff_expira_em", None)
 
     if pet["buff_expira_em"]:
-        data_expira = datetime.fromisoformat(pet["buff_expira_em"])
-        if datetime.now() > data_expira:
-            pet["sorte_bonus"] = 0.0
-            pet["bonus_xp"] = 1.0
+        try:
+            data_expira = datetime.fromisoformat(pet["buff_expira_em"])
+            if datetime.now() > data_expira:
+                pet["sorte_bonus"] = 0.0
+                pet["bonus_xp"] = 1.0
+                pet["buff_expira_em"] = None
+                save_json(DB_RPG, dados_rpg)
+        except Exception:
             pet["buff_expira_em"] = None
-            save_json(DB_RPG, dados_rpg)
 
     return pet
 
@@ -151,7 +181,6 @@ intents.message_content = True
 intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
-GUILD_ID = 1434359569718706320
 
 @bot.event
 async def on_ready():
@@ -173,7 +202,6 @@ async def on_ready():
 @bot.command(name="sync")
 @commands.is_owner()
 async def sync(ctx: commands.Context, spec: str = None):
-    """Sincroniza os comandos Slash dinamicamente (Uso: !sync ou !sync guild)"""
     if spec == "guild":
         synced = await bot.tree.sync(guild=ctx.guild)
         await ctx.send(f"✅ **{len(synced)}** comandos sincronizados neste servidor!")
@@ -480,7 +508,7 @@ async def darsorte(
     if user_id not in db.get("pets", {}):
         return await interaction.followup.send("❌ Esse usuário não possui um pet cadastrado!", ephemeral=True)
 
-    pet = db["pets"][user_id]
+    pet = sanitizar_pet(db["pets"][user_id])
     
     data_expiracao = datetime.now() + timedelta(days=dias)
     
@@ -488,6 +516,7 @@ async def darsorte(
     pet["bonus_xp"] = bonus_xp
     pet["buff_expira_em"] = data_expiracao.isoformat()
 
+    db["pets"][user_id] = pet
     save_json(DB_RPG, db)
 
     embed = discord.Embed(
@@ -887,21 +916,36 @@ async def renomear_canal(
         await interaction.followup.send(f"⚠️ Ocorreu um erro ao renomear: `{e}`", ephemeral=True)
 
 # ==========================================
-# 🛡️ MODERAÇÃO E GESTÃO
+# 🛡️ MODERAÇÃO E GESTÃO (BLINDADOS)
 # ==========================================
 @bot.tree.command(name="limpar", description="Apaga mensagens em massa")
 @app_commands.checks.has_permissions(manage_messages=True)
 async def limpar(interaction: discord.Interaction, quantidade: int):
     await interaction.response.defer(ephemeral=True)
-    deleted = await interaction.channel.purge(limit=quantidade)
-    await interaction.followup.send(f"🧹 **{len(deleted)}** mensagens apagadas!", ephemeral=True)
+    
+    if quantidade < 1 or quantidade > 100:
+        return await interaction.followup.send("❌ Digite um número entre 1 e 100.", ephemeral=True)
+
+    try:
+        deleted = await interaction.channel.purge(limit=quantidade, bulk=True)
+        await interaction.followup.send(f"🧹 **{len(deleted)}** mensagens apagadas com sucesso!", ephemeral=True)
+    except discord.Forbidden:
+        await interaction.followup.send("❌ **Erro de Permissão:** O bot precisa de `Gerenciar Mensagens` e `Ver Histórico` neste canal.", ephemeral=True)
+    except discord.HTTPException:
+        await interaction.followup.send("❌ Mensagens enviadas há mais de 14 dias não podem ser apagadas em massa pelo Discord.", ephemeral=True)
 
 @bot.tree.command(name="limparuser", description="Apaga mensagens de um usuário específico")
 @app_commands.checks.has_permissions(manage_messages=True)
 async def limparuser(interaction: discord.Interaction, membro: discord.Member, quantidade: int = 20):
     await interaction.response.defer(ephemeral=True)
-    deleted = await interaction.channel.purge(limit=quantidade, check=lambda m: m.author.id == membro.id)
-    await interaction.followup.send(f"🧹 Apagadas **{len(deleted)}** mensagens de {membro.mention}!", ephemeral=True)
+    
+    try:
+        deleted = await interaction.channel.purge(limit=quantidade, check=lambda m: m.author.id == membro.id, bulk=True)
+        await interaction.followup.send(f"🧹 Apagadas **{len(deleted)}** mensagens de {membro.mention}!", ephemeral=True)
+    except discord.Forbidden:
+        await interaction.followup.send("❌ Sem permissão para apagar mensagens neste canal.", ephemeral=True)
+    except discord.HTTPException:
+        await interaction.followup.send("❌ Falha ao apagar mensagens (mensagens antigas +14 dias impedem purga em massa).", ephemeral=True)
 
 @bot.tree.command(name="kick", description="Expulsa um membro")
 @app_commands.checks.has_permissions(kick_members=True)
@@ -1005,13 +1049,19 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
         msg = f"⏳ Calma aí! Seus personagens estão exaustos. Você poderá batalhar novamente em **{minutos} minutos**."
     elif isinstance(error, app_commands.MissingPermissions):
         msg = "❌ Você não tem permissão para usar este comando."
+    elif isinstance(error, app_commands.BotMissingPermissions):
+        msg = "⚠️ O bot precisa de mais permissões no canal/servidor para executar esta ação."
     else:
+        logging.error(f"Erro em comando Slash: {error}")
         msg = f"❌ Ocorreu um erro ao executar este comando: `{error}`"
 
-    if not interaction.response.is_done():
-        await interaction.response.send_message(msg, ephemeral=True)
-    else:
-        await interaction.followup.send(msg, ephemeral=True)
+    try:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(msg, ephemeral=True)
+        else:
+            await interaction.followup.send(msg, ephemeral=True)
+    except Exception:
+        pass
 
 # ==========================================
 # 🚀 INICIALIZAÇÃO E CARREGAMENTO DE EXTENSÕES
@@ -1032,7 +1082,7 @@ async def main():
         except Exception as e:
             logging.error(f"⚠️ Erro ao carregar 'pet_rpg': {e}")
 
-        # 2. Cog de Música (mudar para "cogs.music" se o arquivo music.py estiver na pasta cogs)
+        # 2. Cog de Música
         try:
             await bot.load_extension("cogs.music")
             logging.info("🟢 Cog 'music' carregada!")
