@@ -19,7 +19,7 @@ class Music(commands.Cog):
         
         node = wavelink.Node(
             identifier="ZyklonRenderNode",
-            uri="https://lavalink-qvir.onrender.com:443",
+            uri="https://lavalink-qvir.onrender.com",
             password="$1N;ZyklonSS"
         )
         try:
