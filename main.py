@@ -5,6 +5,7 @@ import json
 import logging
 import discord
 import aiohttp
+from typing import Optional
 from datetime import datetime, timedelta
 from discord.ext import commands
 from discord import app_commands
@@ -41,10 +42,10 @@ COMANDOS_INICIAIS_PADRAO = {
         "/daily": "Coleta sua recompensa diária de Golds.",
         "/foguinho": "Aposte e tente multiplicar seus Golds sem explodir.",
         "/masmorra": "Enfrente monstros nas profundezas por recompensas.",
-        "/pet": "Cuide do seu companheiro de batalha.",
+        "/pet_perfil": "Cuide e veja os status do seu companheiro de batalha.",
         "/explorar": "Explora biomas perigosos (Requer Nível 20+).",
         "/velha": "Desafie outro membro para um X1 de Jogo da Velha.",
-        "/akinator": "Inicia um jogo interativo com o Akinator para adivinhar seu personagem.",
+        "/akinator": "Inicia um jogo interativo com o Akinator.",
         "/ppt": "Desafie a IA para uma partida de Pedra, Papel ou Tesoura.",
         "/dado": "Rola um dado virtual de 6 a 100 lados.",
         "/caracoroa": "Aposte Golds no cara ou coroa contra o bot.",
@@ -56,7 +57,7 @@ COMANDOS_INICIAIS_PADRAO = {
         "/rank": "Exibe o TOP 10 dos membros mais ricos do servidor."
     },
     "🛠️ Utilitários & IAs": {
-        "/gemini": "Pergunta algo para a IA do Google (Gemini 2.5 Flash).",
+        "/gemini": "Pergunta algo para a IA do Google (Gemini).",
         "/chatgpt": "Pergunta algo para o ChatGPT (GPT-4o-mini).",
         "/moeda": "Consulta cotações e converte valores entre moedas (USD, EUR, BRL, BTC).",
         "/ping": "Exibe a latência de conexão do bot.",
@@ -76,8 +77,7 @@ COMANDOS_INICIAIS_PADRAO = {
         "/set_passe_cargo": "Associa uma palavra-passe a um cargo automático."
     },
     "🛡️ Moderação & Gestão": {
-        "/setup_servidor": "Cria a estrutura completa de canais do servidor.",
-        "/setup_rpg": "Cria isoladamente a categoria e canais do RPG Yggdrasil.",
+        "/setup_ranks": "Cria os cargos de Rank de Aventureiro no servidor.",
         "/limpar": "Apaga mensagens em massa no canal.",
         "/limparuser": "Apaga mensagens de um usuário específico.",
         "/kick": "Expulsa um membro do servidor.",
@@ -117,55 +117,6 @@ def save_json(file_path, data):
             json.dump(data, f, indent=4, ensure_ascii=False)
     except Exception as e:
         logging.error(f"Erro ao salvar {file_path}: {e}")
-
-def sanitizar_pet(pet):
-    """Garante que atributos numéricos do pet não sejam dicts nem None."""
-    if not isinstance(pet, dict):
-        return {}
-
-    for campo in ["xp", "nivel", "vitorias", "vida"]:
-        val = pet.get(campo, 0)
-        if isinstance(val, dict):
-            pet[campo] = val.get("value", 0) if isinstance(val.get("value"), (int, float)) else 0
-        elif not isinstance(val, int):
-            try:
-                pet[campo] = int(val)
-            except (ValueError, TypeError):
-                pet[campo] = 0
-
-    for campo_float in ["sorte_bonus", "bonus_xp"]:
-        val = pet.get(campo_float, 1.0)
-        if isinstance(val, dict):
-            pet[campo_float] = 1.0
-        elif not isinstance(val, (int, float)):
-            try:
-                pet[campo_float] = float(val)
-            except (ValueError, TypeError):
-                pet[campo_float] = 1.0
-
-    return pet
-
-def obter_pet_com_buffs(user_id: str, dados_rpg: dict):
-    pet = dados_rpg.get("pets", {}).get(user_id)
-    if not pet:
-        return None
-
-    pet = sanitizar_pet(pet)
-
-    pet.setdefault("buff_expira_em", None)
-
-    if pet["buff_expira_em"]:
-        try:
-            data_expira = datetime.fromisoformat(pet["buff_expira_em"])
-            if datetime.now() > data_expira:
-                pet["sorte_bonus"] = 0.0
-                pet["bonus_xp"] = 1.0
-                pet["buff_expira_em"] = None
-                save_json(DB_RPG, dados_rpg)
-        except Exception:
-            pet["buff_expira_em"] = None
-
-    return pet
 
 # =========================================================
 # CONFIGURAÇÃO DE IA E BOT DISCORD
@@ -292,7 +243,7 @@ async def fixar_produto(
 # 🪙 SISTEMA DE GOLDS (ECONOMIA CONECTADA AO economy.py)
 # =========================================================
 @bot.tree.command(name="carteira", description="Exibe o seu saldo atual de Golds.")
-async def carteira(interaction: discord.Interaction, usuario: discord.Member = None):
+async def carteira(interaction: discord.Interaction, usuario: Optional[discord.Member] = None):
     target = usuario or interaction.user
     saldo = economy.get_gold(target.id)
 
@@ -489,7 +440,7 @@ async def painelticket(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, view=PainelTicketView())
 
 # ==========================================
-# 🛠️ UTILITÁRIOS E COMANDO DAR SORTE (CORRIGIDO)
+# 🛠️ UTILITÁRIOS E COMANDO DAR SORTE
 # ==========================================
 @bot.tree.command(name="darsorte", description="Aplica um buff temporário de sorte e bônus de XP a um jogador.")
 @app_commands.checks.has_permissions(administrator=True)
@@ -508,8 +459,7 @@ async def darsorte(
     if user_id not in db.get("pets", {}):
         return await interaction.followup.send("❌ Esse usuário não possui um pet cadastrado!", ephemeral=True)
 
-    pet = sanitizar_pet(db["pets"][user_id])
-    
+    pet = db["pets"][user_id]
     data_expiracao = datetime.now() + timedelta(days=dias)
     
     pet["sorte_bonus"] = sorte
@@ -539,7 +489,7 @@ async def ping(interaction: discord.Interaction):
     await interaction.followup.send(f"🏓 Pong! Latência atual: **{ms}ms**")
 
 @bot.tree.command(name="userinfo", description="Exibe informações de um membro")
-async def userinfo(interaction: discord.Interaction, membro: discord.Member = None):
+async def userinfo(interaction: discord.Interaction, membro: Optional[discord.Member] = None):
     await interaction.response.defer()
     alvo = membro or interaction.user
     roles = [role.mention for role in alvo.roles if role.name != "@everyone"]
@@ -676,7 +626,7 @@ async def ajuda(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 @bot.tree.command(name="avatar", description="Manda o avatar de um membro")
-async def avatar(interaction: discord.Interaction, membro: discord.Member = None):
+async def avatar(interaction: discord.Interaction, membro: Optional[discord.Member] = None):
     await interaction.response.defer()
     alvo = membro or interaction.user
     embed = discord.Embed(title=f"🖼️ Avatar de {alvo.name}", color=discord.Color.dark_theme())
@@ -856,8 +806,8 @@ async def criar_canal(
     interaction: discord.Interaction, 
     nome_decorado: str, 
     tipo: app_commands.Choice[str], 
-    categoria: discord.CategoryChannel = None,
-    topico: str = None
+    categoria: Optional[discord.CategoryChannel] = None,
+    topico: Optional[str] = None
 ):
     await interaction.response.defer(ephemeral=True)
 
@@ -893,7 +843,7 @@ async def criar_canal(
 async def renomear_canal(
     interaction: discord.Interaction, 
     novo_nome_decorado: str, 
-    canal: discord.abc.GuildChannel = None
+    canal: Optional[discord.abc.GuildChannel] = None
 ):
     await interaction.response.defer(ephemeral=True)
 
@@ -985,7 +935,7 @@ async def warn(interaction: discord.Interaction, membro: discord.Member, motivo:
         await membro.send(embed=embed)
     except Exception:
         pass
-    await interaction.followup.send(f"⚠️ Advertência aplicada a **{membro.mention}**!\n**Motivo:** *{motivo}*")
+    await interaction.followup.send(f"⚠️ Advertência applied a **{membro.mention}**!\n**Motivo:** *{motivo}*")
 
 @bot.tree.command(name="addcargo", description="Adiciona um cargo a um membro")
 @app_commands.checks.has_permissions(manage_roles=True)
@@ -1075,12 +1025,12 @@ async def main():
             logging.error("❌ ERRO CRÍTICO: DISCORD_TOKEN não encontrado!")
             return
         
-        # 1. Cog do RPG
+        # 1. Cog do RPG (Corrigido caminho relativo do pacote cogs)
         try:
-            await bot.load_extension("pet_rpg")
-            logging.info("🟢 Cog 'pet_rpg' carregada!")
+            await bot.load_extension("cogs.pet_rpg")
+            logging.info("🟢 Cog 'cogs.pet_rpg' carregada!")
         except Exception as e:
-            logging.error(f"⚠️ Erro ao carregar 'pet_rpg': {e}")
+            logging.error(f"⚠️ Erro ao carregar 'cogs.pet_rpg': {e}")
 
         # 2. Cog de Música
         try:
