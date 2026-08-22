@@ -671,6 +671,7 @@ class PetRPG(commands.Cog):
         beneficios = obter_beneficios_pet(pet.get("nivel", 1), db)
 
         promocao = None
+        disparar_convite = False
 
         if evento_perigo:
             monstro = random.choice(info["mobs"])
@@ -695,18 +696,26 @@ class PetRPG(commands.Cog):
                 pet["xp"] = pet.get("xp", 0) + xp_ganho
                 
                 lvl_up = False
-                if pet["xp"] >= 150:
+                while pet["xp"] >= 150:
                     pet["nivel"] = pet.get("nivel", 1) + 1
                     pet["xp"] -= 150
                     lvl_up = True
                     pet["vida"] = 100
+                    if "stats" in pet:
+                        pet["stats"]["hp_atual"] = 100
 
                 save_rpg_db(db)
 
                 promocao = await checar_promocao_rank(interaction.user, pet["nivel"], db)
 
+                # Checa se subiu/está nível >= 20 para enviar o convite uma única vez
+                if pet.get("nivel", 1) >= 20 and not pet.get("convite_enviado", False):
+                    pet["convite_enviado"] = True
+                    disparar_convite = True
+                    save_rpg_db(db)
+
                 txt_bonus = f" *(+{int((beneficios['bonus_gold']-1)*100)}% Bônus de Rank)*" if beneficios['bonus_gold'] > 1.0 else ""
-                txt_xp = f" *(XP x{pet['bonus_xp']} Ativo)*" if pet.get("bonus_xp", 1.0) > 1.0 else ""
+                txt_xp = f" *(XP x{pet.get('bonus_xp', 1.0)} Ativo)*" if pet.get("bonus_xp", 1.0) > 1.0 else ""
 
                 embed = discord.Embed(
                     title=f"⚔️ Vitória em {info['nome']}!",
@@ -762,10 +771,7 @@ class PetRPG(commands.Cog):
                 inline=False
             )
 
-        if pet.get("nivel", 1) >= 20 and not pet.get("convite_enviado", False):
-            pet["convite_enviado"] = True
-            save_rpg_db(db)
-
+        if disparar_convite:
             convite_embed = discord.Embed(
                 title="🌟 Seu Pet Alcançou o Nível 20!",
                 description=(
@@ -782,11 +788,10 @@ class PetRPG(commands.Cog):
             if canal_aviso:
                 await canal_aviso.send(content=interaction.user.mention, embed=convite_embed, view=view)
             else:
-                await interaction.followup.send(f"{interaction.user.mention}", embed=convite_embed, view=view, ephemeral=False)
+                await interaction.followup.send(content=interaction.user.mention, embed=convite_embed, view=view, ephemeral=False)
 
         embed.set_footer(text=f"Explorador: {interaction.user.display_name} • 🐾 Pet: {pet.get('nome', 'Pet')} (Nv. {pet.get('nivel', 1)}) • Rank: {beneficios['rank_nome']}")
         await interaction.followup.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(PetRPG(bot))
-            
