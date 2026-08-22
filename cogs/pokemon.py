@@ -6,21 +6,71 @@ import random
 import asyncio
 import logging
 import sqlite3
+import json
+import os
 
-# -------------------------------------------------------------------
-# 🔗 INTEGRAÇÃO COM ECONOMY.PY
-# Altere para a importação/função real do seu sistema de economia:
-# -------------------------------------------------------------------
-try:
-    from cogs.economy import consultar_saldo, remover_saldo
-except ImportError:
-    # Funções de fallback caso o módulo de economia use nomes diferentes
-    def consultar_saldo(user_id: int) -> int:
-        return 10000  # Exemplo de teste
-    def remover_saldo(user_id: int, valor: int) -> bool:
-        return True
+# =========================================================
+# 💰 SISTEMA DE ECONOMIA (INTEGRADO DIRECTAMENTE)
+# =========================================================
+CAMINHO_BANCO = "database_golds.json"
+_lock = asyncio.Lock()
 
-# --- CONFIGURAÇÕES DE POKÉBOLAS ---
+def _carregar_dados_raw() -> dict:
+    if not os.path.exists(CAMINHO_BANCO):
+        with open(CAMINHO_BANCO, "w", encoding="utf-8") as f:
+            json.dump({}, f, indent=4)
+        return {}
+    
+    try:
+        with open(CAMINHO_BANCO, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logging.error(f"⚠️ Erro ao ler {CAMINHO_BANCO}: {e}")
+        return {}
+
+def _salvar_dados_raw(dados: dict):
+    try:
+        with open(CAMINHO_BANCO, "w", encoding="utf-8") as f:
+            json.dump(dados, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        logging.error(f"⚠️ Erro ao salvar {CAMINHO_BANCO}: {e}")
+
+def get_gold(user_id: int) -> int:
+    dados = _carregar_dados_raw()
+    user_str = str(user_id)
+    val = dados.get(user_str, 0)
+    
+    if isinstance(val, dict):
+        return int(val.get("gold", 0))
+    if isinstance(val, (int, float)):
+        return int(val)
+    return 0
+
+def remove_gold(user_id: int, valor: int) -> bool:
+    dados = _carregar_dados_raw()
+    user_str = str(user_id)
+    saldo_atual = get_gold(user_id)
+    valor_int = int(valor)
+    
+    if valor_int <= 0 or saldo_atual < valor_int:
+        return False
+        
+    dados[user_str] = max(0, saldo_atual - valor_int)
+    _salvar_dados_raw(dados)
+    return True
+
+async def get_gold_safe(user_id: int) -> int:
+    async with _lock:
+        return get_gold(user_id)
+
+async def remove_gold_safe(user_id: int, valor: int) -> bool:
+    async with _lock:
+        return remove_gold(user_id, valor)
+
+
+# =========================================================
+# 🔴 SISTEMA DE POKÉMON E POKÉBOLAS
+# =========================================================
 POKEBOLAS = {
     "pokeball": {"nome": "Pokébola", "preco": 100, "taxa": 0.50, "emoji": "🔴"},
     "superball": {"nome": "Superbola", "preco": 300, "taxa": 0.70, "emoji": "🔵"},
@@ -30,7 +80,6 @@ POKEBOLAS = {
 
 DB_NAME = "pokemon_bot.db"
 
-# --- BANCO DE DADOS (SQLITE) ---
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -189,7 +238,6 @@ class CaptureView(discord.ui.View):
             await interaction.response.send_message("❌ Este Pokémon já foi capturado!", ephemeral=True)
             return
 
-        # Abre o Menu para escolher qual Pokébola usar
         menu_view = discord.ui.View(timeout=30.0)
         menu_view.add_item(SelectPokeballMenu(interaction.user.id, self.pokemon, self))
 
@@ -314,14 +362,12 @@ class PokemonCog(commands.Cog):
             color=discord.Color.dark_purple()
         )
 
-        # Seção de Itens (Pokébolas)
         bolas_txt = ""
         for key, info in POKEBOLAS.items():
             qtd = bolas.get(key, 0)
             bolas_txt += f"{info['emoji']} **{info['nome']}:** {qtd}\n"
         embed.add_field(name="📦 Itens de Captura", value=bolas_txt, inline=False)
 
-        # Seção de Pokémons
         if not pokemons:
             embed.add_field(name="🔴 Pokémons Capturados", value="*Nenhum Pokémon capturado ainda.*", inline=False)
         else:
@@ -335,45 +381,49 @@ class PokemonCog(commands.Cog):
         await interaction.followup.send(embed=embed)
 
     # --- COMANDO SLASH: POKELOJA ---
-    @app_commands.command(name="pokeloja", description="Compre Pokébolas utilizando seu saldo.")
+    @app_commands.command(name="pokeloja", description="Compre Pokébolas utilizando seus Golds.")
     @app_commands.describe(
         item="Tipo de Pokébola para comprar",
         quantidade="Quantidade desejada"
     )
     @app_commands.choices(item=[
-        app_commands.Choice(name="🔴 Pokébola - $100 (50% Taxa)", value="pokeball"),
-        app_commands.Choice(name="🔵 Superbola - $300 (70% Taxa)", value="superball"),
-        app_commands.Choice(name="🟡 Ultrabola - $800 (85% Taxa)", value="ultraball"),
-        app_commands.Choice(name="🟣 Masterbola - $5000 (100% Taxa)", value="masterball"),
+        app_commands.Choice(name="🔴 Pokébola - 100 Golds (50% Taxa)", value="pokeball"),
+        app_commands.Choice(name="🔵 Superbola - 300 Golds (70% Taxa)", value="superball"),
+        app_commands.Choice(name="🟡 Ultrabola - 800 Golds (85% Taxa)", value="ultraball"),
+        app_commands.Choice(name="🟣 Masterbola - 5000 Golds (100% Taxa)", value="masterball"),
     ])
     async def pokeloja(self, interaction: discord.Interaction, item: str, quantidade: int = 1):
+        await interaction.response.defer(ephemeral=True)
+
         if quantidade <= 0:
-            await interaction.response.send_message("❌ A quantidade precisa ser pelo menos 1!", ephemeral=True)
+            await interaction.followup.send("❌ A quantidade precisa ser pelo menos 1!")
             return
 
         info_item = POKEBOLAS[item]
         custo_total = info_item["preco"] * quantidade
         user_id = interaction.user.id
 
-        saldo_atual = consultar_saldo(user_id)
+        saldo_atual = await get_gold_safe(user_id)
 
         if saldo_atual < custo_total:
-            await interaction.response.send_message(
-                f"❌ Saldo insuficiente! Você precisa de **${custo_total}** mas possui **${saldo_atual}**.",
-                ephemeral=True
+            await interaction.followup.send(
+                f"❌ Saldo insuficiente! Você precisa de **{custo_total} Golds** mas possui **{saldo_atual} Golds**."
             )
             return
 
-        # Executa o débito no sistema de economia e adiciona as bolas na mochila
-        remover_saldo(user_id, custo_total)
+        removido = await remove_gold_safe(user_id, custo_total)
+        if not removido:
+            await interaction.followup.send("❌ Ocorreu um erro ao processar o débito dos seus Golds.")
+            return
+
         adicionar_bola(user_id, item, quantidade)
 
         embed = discord.Embed(
             title="🛒 PokéLoja - Compra Concluída!",
-            description=f"Você comprou **{quantidade}x {info_item['emoji']} {info_item['nome']}** por **${custo_total}**!",
+            description=f"Você comprou **{quantidade}x {info_item['emoji']} {info_item['nome']}** por **{custo_total} Golds**!",
             color=discord.Color.gold()
         )
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed)
 
 
 async def setup(bot):
