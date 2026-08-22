@@ -20,7 +20,7 @@ class Music(commands.Cog):
         node = wavelink.Node(
             identifier="ZyklonRenderNode",
             uri="https://lavalink-qvir.onrender.com:443",
-            password="zyklon123"
+            password="$1N;ZyklonSS"
         )
         try:
             await wavelink.Pool.connect(nodes=[node], client=self.bot)
